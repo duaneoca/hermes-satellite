@@ -150,31 +150,55 @@ guidance, Wi-Fi (WPA3) caveats, and fully-offline install instructions.
 
 ## Running as a service
 
-1. Install to `/opt/hermes-satellite` with its own venv:
+The deployed daemon runs as a dedicated **`hermes` system user** whose entire
+privilege is "may touch sound, SPI and GPIO." Ownership principle: *the
+service can write only its own data directory.*
+
+| Path | Owner / mode | Service access | Holds |
+| ---- | ------------ | -------------- | ----- |
+| `/opt/hermes-satellite` | root | read-only | code + venv |
+| `/etc/hermes-satellite/config.yaml` | root:hermes 640 | read-only | configuration |
+| `/etc/hermes-satellite/secrets.env` | root:root 600 | none (systemd reads it) | API keys |
+| `/var/lib/hermes-satellite` | hermes:hermes | **read-write** | models, caches, lgpio pipes |
+
+The unit also enables systemd sandboxing (`ProtectSystem=strict`,
+`ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) — appropriate hygiene for an
+always-listening device. Your development clone (e.g. `~/git/hermes-satellite`)
+stays your user's and is unrelated to the deployed copy.
+
+1. Create the service user, then install to `/opt` (root-owned, venv from the
+   same Python that worked interactively — on Trixie that's the uv 3.11):
    ```bash
-   sudo mkdir -p /opt/hermes-satellite && sudo chown $USER /opt/hermes-satellite
-   python -m venv /opt/hermes-satellite/.venv
-   /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
-   /opt/hermes-satellite/.venv/bin/pip install -e .           # add [pi4] or [pi5]
+   sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes
+   sudo mkdir -p /opt/hermes-satellite
+   sudo git clone https://github.com/duaneoca/hermes-satellite /opt/hermes-satellite
+   sudo uv venv --seed --python 3.11 /opt/hermes-satellite/.venv
+   sudo /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
+   sudo /opt/hermes-satellite/.venv/bin/pip install -e "/opt/hermes-satellite[pi4]"  # or [pi5]
    ```
-2. Put config at `/etc/hermes-satellite/config.yaml` and (optionally) secrets in
-   `/etc/hermes-satellite/secrets.env`. **Models (Piper voice, custom wake
-   word, verifier) are data, not config — they live in
-   `/var/lib/hermes-satellite/`**, owned by the service user:
+2. Config and secrets (admin-owned, service-readable where needed):
    ```bash
-   sudo mkdir -p /var/lib/hermes-satellite
-   sudo chown hermes:hermes /var/lib/hermes-satellite
+   sudo mkdir -p /etc/hermes-satellite
+   sudo cp config.yaml /etc/hermes-satellite/config.yaml       # your tuned config
+   sudo chown root:hermes /etc/hermes-satellite/config.yaml
+   sudo chmod 640 /etc/hermes-satellite/config.yaml
+   sudo tee /etc/hermes-satellite/secrets.env >/dev/null <<'EOF'
+   HERMES_API_KEY=...
+   HERMES_SESSION_KEY=...
+   EOF
+   sudo chmod 600 /etc/hermes-satellite/secrets.env
    ```
-3. The unit sets `XDG_CACHE_HOME=/var/lib/hermes-satellite/cache` because
-   the service user has no home directory — Moonshine's STT model cache
-   (~80 MB) lands there. Pre-seed it so the first service start doesn't
-   need egress (command in the unit's comments), or copy an existing
-   cache: `~/.cache/moonshine_voice/` → 
-   `/var/lib/hermes-satellite/cache/moonshine_voice/`.
-4. Create the service user and install the unit:
+3. Data directory (the only place the service writes) — move models in and
+   pre-seed the Moonshine cache so first start needs no egress:
    ```bash
-   sudo useradd -r -G spi,audio,gpio hermes
-   sudo cp systemd/hermes-satellite.service /etc/systemd/system/
+   sudo mkdir -p /var/lib/hermes-satellite/cache
+   # Piper voice etc. should already live here per the setup docs; then:
+   sudo cp -r ~/.cache/moonshine_voice /var/lib/hermes-satellite/cache/
+   sudo chown -R hermes:hermes /var/lib/hermes-satellite
+   ```
+4. Install and start the unit:
+   ```bash
+   sudo cp /opt/hermes-satellite/systemd/hermes-satellite.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now hermes-satellite
    sudo systemctl status hermes-satellite

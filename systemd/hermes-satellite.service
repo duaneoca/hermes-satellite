@@ -15,7 +15,10 @@ Group=hermes
 SupplementaryGroups=spi audio gpio
 
 # Adjust paths to your install. The venv is created at /opt/hermes-satellite.
-WorkingDirectory=/opt/hermes-satellite
+# NB: the working directory must be WRITABLE by the service — lgpio creates
+# its .lgd-nfy* notification pipes in the CWD — so it points at the data dir,
+# not the read-only install.
+WorkingDirectory=/var/lib/hermes-satellite
 # Re-apply the WM8960 mixer state on every start — defends against stale
 # alsactl snapshots silently disabling the capture path (see the pi4 hardware
 # guide's troubleshooting section). Uncomment on ReSpeaker 2-Mic v1 setups:
@@ -34,6 +37,16 @@ EnvironmentFile=-/etc/hermes-satellite/secrets.env
 #     /opt/hermes-satellite/.venv/bin/python -c \
 #     "import moonshine_voice as mv; mv.get_model_for_language('en', mv.ModelArch.BASE)"
 Environment=XDG_CACHE_HOME=/var/lib/hermes-satellite/cache
+
+# --- sandboxing: the service can write only its own data directory ---------
+# Filesystem read-only except the declared paths; no /home; private /tmp;
+# can never gain privileges. Device access (ALSA/SPI/GPIO) still works via
+# the supplementary groups — none of these options block device nodes.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/hermes-satellite
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
 
 Restart=on-failure
 RestartSec=3
