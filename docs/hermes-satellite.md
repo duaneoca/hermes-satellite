@@ -80,8 +80,9 @@ on unmute.
 ## Mute button
 
 `button.py`. `Mute` holds a thread‑safe flag with change listeners. The button
-backend is chosen from the hardware profile — `RpiGpioButton` (Pi 4),
-`LgpioButton` (Pi 5), or `MockButton` (Enter on stdin). Each press calls
+backend is chosen from the hardware profile — `LgpioButton` (Pi 4 and Pi 5;
+RPi.GPIO edge detection is broken on kernels ≥ ~6.6), `RpiGpioButton` (legacy
+kernels only), or `MockButton` (Enter on stdin). Each press calls
 `Mute.toggle()`. The wakeword detector and audio capture receive `is_muted` and
 ignore audio while it returns True.
 
