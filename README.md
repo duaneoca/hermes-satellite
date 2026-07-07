@@ -67,6 +67,7 @@ See the per‑board setup guides under [`docs/hardware/`](docs/hardware/).
 
 - [Architecture & implementation guide](docs/hermes-satellite.md)
 - [Hermes API integration](docs/hermes-api.md)
+- [Networking / IoT VLAN deployment](docs/networking.md)
 - [Wake word (openWakeWord)](docs/wakeword.md)
 - [Porcupine backend (optional)](docs/porcupine.md)
 - [Moonshine (STT)](docs/moonshine.md)
