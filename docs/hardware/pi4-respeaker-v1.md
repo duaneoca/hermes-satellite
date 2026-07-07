@@ -69,9 +69,23 @@ print(f"peak {100*peak/32767:.1f}% of full scale")
 EOF
 ```
 
-Speech from your normal talking distance should peak **~30-70%**. Under ~20%:
-raise `Capture` in steps of 5. At 95-100% (clipping): lower it. When it lands
-in range, persist everything: `sudo alsactl store`.
+Speech from your normal talking distance should peak **~30-70%**. Calibration
+rules learned the hard way:
+
+- **Keep takes comparable**: same phrase, same distance, same voice level —
+  position dominates everything (close-talking vs across the room is 20+ dB,
+  more than any mixer setting).
+- **Scales**: `Capture` (analog PGA) is 0-63, 63 = +30 dB — amixer silently
+  clamps larger values. `ADC PCM` (digital) is 0-255, 195 = 0 dB, 0.5 dB/step.
+- **At conversational distance these mics need lots of gain**: expect to run
+  `Capture` at or near 63 and then tune with `ADC PCM` (start ~220 = +12.5 dB;
+  ±10 steps = ±5 dB) until speech peaks 30-70%. Close-mic use is the opposite:
+  back `Capture` off first.
+- **If raising gain doesn't raise the peak**, check the automatic level
+  control isn't overriding the PGA: `amixer -c $C sget 'ALC Function'` must be
+  `None` (`amixer -c $C sset 'ALC Function' None`).
+
+When it lands in range, persist everything: `sudo alsactl store`.
 
 ### Option B (fallback): Seeed's out-of-tree driver, kernel-matched branch
 
