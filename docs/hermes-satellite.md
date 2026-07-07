@@ -133,6 +133,7 @@ Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
    ```bash
    sudo mkdir -p /opt/hermes-satellite && sudo chown $USER /opt/hermes-satellite
    python -m venv /opt/hermes-satellite/.venv
+   /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
    /opt/hermes-satellite/.venv/bin/pip install -e .           # add [pi4] or [pi5]
    ```
 2. Put config at `/etc/hermes-satellite/config.yaml` and (optionally) secrets in

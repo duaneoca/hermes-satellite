@@ -35,12 +35,21 @@ any machine. On‑device validation (real mic/speaker/LEDs) still needs the Pi.
 ## Quick start (development, no hardware)
 
 ```bash
+git clone https://github.com/duaneoca/hermes-satellite.git
+cd hermes-satellite
 python -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip setuptools wheel   # older pips can't editable-install
+                                             # from pyproject.toml alone
 pip install -e ".[dev]"
 pytest
 cp config.example.yaml config.yaml   # edit as needed
 hermes-satellite --demo --hardware-profile mock --config config.example.yaml
 ```
+
+Deploying to a Pi? Follow your board's guide instead:
+[Pi 4 + HAT v1](docs/hardware/pi4-respeaker-v1.md) ·
+[Pi 5 + HAT v2](docs/hardware/pi5-respeaker-v2.md) — they cover the codec
+driver, SPI, groups, and install order.
 
 `--demo` uses mock wakeword/audio/STT/TTS/LEDs and a canned agent reply, walking
 the state machine through a full cycle. Press Enter to toggle mute.

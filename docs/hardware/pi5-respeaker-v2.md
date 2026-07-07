@@ -40,9 +40,17 @@ aplay test.wav
 ```
 
 > The overlay name/source and card name depend on the current Seeed release —
-> always cross‑check the wiki. Record the ALSA indices into `audio.input_device`
-> / `audio.output_device`. If mono capture fails, set
-> `audio.input_channels: 2` — the daemon then uses channel 0 (the left mic).
+> always cross‑check the wiki.
+
+**Audio device config:** usually leave `audio.input_device` / `output_device`
+as `null` (system default) and make the HAT the default card in
+`/etc/asound.conf`. If you must pin devices, the values are **sounddevice
+(PortAudio) integer indices, not `arecord -l` card numbers** — list them with
+`python -c "import sounddevice as sd; print(sd.query_devices())"` from the
+project venv and use the leading index. Full walkthrough with sample output:
+[pi4-respeaker-v1.md](pi4-respeaker-v1.md#audio-device-config-needed-or-not)
+(identical procedure on the Pi 5). If mono capture fails, set
+`audio.input_channels: 2` — the daemon then uses channel 0 (the left mic).
 
 ## 2. Enable SPI and confirm the LED device node
 
@@ -79,12 +87,22 @@ The RP1 header enumerates as **`gpiochip0`** on current Raspberry Pi OS
 gpioinfo | grep -i gpiochip        # from gpiod; identify the RP1 40-pin header
 ```
 
-Ensure the service user is in the `gpio` group.
+The daemon's user needs the `gpio`, `spi`, and `audio` groups. Check and fix:
+
+```bash
+id -nG                 # lists the current user's groups
+sudo usermod -aG gpio,spi,audio $USER
+exit                   # group changes take effect on next login; re-check
+```
 
 ## 4. Install & run
 
 ```bash
+git clone https://github.com/duaneoca/hermes-satellite.git
+cd hermes-satellite
 python -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip setuptools wheel   # Raspberry Pi OS pip is too old
+    # for pyproject.toml editable installs ('File "setup.py" not found ...')
 pip install -e ".[pi5]"
 cp config.example.yaml config.yaml     # hardware_profile: pi5-respeaker-v2
 hermes-satellite --demo --config config.yaml   # LED + button smoke test
