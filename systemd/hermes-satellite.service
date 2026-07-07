@@ -16,6 +16,10 @@ SupplementaryGroups=spi audio gpio
 
 # Adjust paths to your install. The venv is created at /opt/hermes-satellite.
 WorkingDirectory=/opt/hermes-satellite
+# Re-apply the WM8960 mixer state on every start — defends against stale
+# alsactl snapshots silently disabling the capture path (see the pi4 hardware
+# guide's troubleshooting section). Uncomment on ReSpeaker 2-Mic v1 setups:
+#ExecStartPre=/opt/hermes-satellite/scripts/wm8960-mixer.sh
 ExecStart=/opt/hermes-satellite/.venv/bin/python -m hermes_satellite \
     --config /etc/hermes-satellite/config.yaml
 # Secrets can be provided out-of-band instead of in config.yaml:

@@ -32,8 +32,10 @@ sudo reboot
 
 After reboot the card should appear in `arecord -l`. **The mainline wm8960
 driver defaults most of the audio-path switches OFF** — capture records
-silence and playback is inaudible until you wire the paths up. This recipe is
-field-verified (Pi 4, kernel 6.18, ReSpeaker 2-Mic v1):
+silence and playback is inaudible until you wire the paths up. The recipe
+below is field-verified (Pi 4, kernel 6.18, ReSpeaker 2-Mic v1) and also
+shipped as [`scripts/wm8960-mixer.sh`](../../scripts/wm8960-mixer.sh) for
+one-command (re)application:
 
 ```bash
 C="seeed2micvoicec"
@@ -244,6 +246,15 @@ state. Then set the wake word model and the Piper voice (see
 `--demo` for the full pipeline.
 
 ## Troubleshooting
+
+- **Mic goes deaf later** (recordings show a constant ~1% noise floor that
+  does not react to voice at all) → the capture routing got re-disabled,
+  typically by a stale `alsactl` snapshot restored at boot (check:
+  `amixer -c seeed2micvoicec sget 'Capture'` shows `[off]`, or
+  `'Left Input Mixer Boost'` is `[off]`). Fix: `./scripts/wm8960-mixer.sh`
+  then **`sudo alsactl store`** to overwrite the bad snapshot. The systemd
+  unit can also re-apply it on every start — see the ExecStartPre line in
+  `systemd/hermes-satellite.service`.
 
 - **No `seeed` ALSA card** after reboot → the DKMS module failed to build for
   your kernel; check `dkms status` and the HinTak fork's issues for your kernel
