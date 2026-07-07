@@ -65,20 +65,41 @@ def _run_ww_monitor(config) -> int:
 
     threshold = config.wakeword.threshold
     print(f"wake word monitor: {config.wakeword.model_path} "
-          f"(threshold {threshold}) — Ctrl-C to exit")
+          f"(threshold {threshold}) — Ctrl-C to exit", flush=True)
+    print("status line shows mic level + best score each second; "
+          "if 'mic' stays at 0% while you talk, no audio is arriving", flush=True)
+
+    state = {"last": time.monotonic(), "peak_rms": 0.0, "best": 0.0}
+
+    def meter(pcm: bytes) -> None:
+        import array
+        import math
+
+        samples = array.array("h", pcm)
+        rms = math.sqrt(sum(s * s for s in samples) / len(samples)) / 32767
+        state["peak_rms"] = max(state["peak_rms"], rms)
+        now = time.monotonic()
+        if now - state["last"] >= 1.0:
+            level = int(state["peak_rms"] * 100)
+            print(f"{time.strftime('%H:%M:%S')}  mic {level:3d}% "
+                  f"{'▮' * min(level // 3, 25):25s} best-score {state['best']:0.3f}",
+                  flush=True)
+            state.update(last=now, peak_rms=0.0, best=0.0)
 
     def show(predictions: dict) -> None:
         score = max(predictions.values())
-        if score >= 0.05:  # don't spam the floor noise
+        state["best"] = max(state["best"], score)
+        if score >= 0.05:
             bar = "#" * int(score * 40)
             marker = "  <<<" if score >= threshold else ""
-            print(f"{time.strftime('%H:%M:%S')}  {score:0.3f} {bar}{marker}")
+            print(f"{time.strftime('%H:%M:%S')}  {score:0.3f} {bar}{marker}", flush=True)
 
     detector.on_score = show
+    detector.on_audio = meter
     try:
         while True:
             if detector.wait_for_wake(lambda: False):
-                print(f"{time.strftime('%H:%M:%S')}  *** DETECTED ***")
+                print(f"{time.strftime('%H:%M:%S')}  *** DETECTED ***", flush=True)
     except KeyboardInterrupt:
         pass
     finally:

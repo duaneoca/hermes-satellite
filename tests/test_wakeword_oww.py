@@ -220,3 +220,20 @@ def test_requires_16k():
 def test_requires_mic():
     with pytest.raises(ValueError):
         OpenWakeWord(_config(), mic=None)
+
+
+def test_on_audio_hook_receives_frames_not_while_muted(fake_oww):
+    fake_oww["scores"] = [0.1, 0.9]
+    ww = OpenWakeWord(_config(), mic=FakeMic())
+    frames = []
+    ww.on_audio = frames.append
+    muted = {"n": 0}
+
+    def is_muted():
+        muted["n"] += 1
+        return muted["n"] <= 2  # first two frames muted
+
+    assert ww.wait_for_wake(is_muted) is True
+    # 2 muted frames skipped, 2 processed frames delivered to the hook
+    assert len(frames) == 2
+    assert all(len(f) == FRAME_SAMPLES * 2 for f in frames)

@@ -63,8 +63,10 @@ class OpenWakeWord(WakeWordDetector):
         self._stop_event = threading.Event()
         self._handle = None
         self._last_detection = 0.0
-        # Hook for --ww-monitor: called with the raw predictions dict per frame.
+        # Hooks for --ww-monitor: called per processed frame with the raw
+        # predictions dict / the raw int16 PCM bytes (for level metering).
         self.on_score: Optional[Callable[[dict], None]] = None
+        self.on_audio: Optional[Callable[[bytes], None]] = None
 
     def _create_model(self):
         from openwakeword.model import Model
@@ -137,6 +139,8 @@ class OpenWakeWord(WakeWordDetector):
             if was_muted:
                 handle.reset()  # don't fire on stale pre-mute state
                 was_muted = False
+            if self.on_audio is not None:
+                self.on_audio(pcm)
             predictions = handle.predict(
                 np.frombuffer(pcm, dtype=np.int16), **predict_kwargs
             )
