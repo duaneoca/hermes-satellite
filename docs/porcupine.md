@@ -43,7 +43,7 @@ wakeword:
 
   ```yaml
   wakeword:
-    model_path: /etc/hermes-satellite/hey-hermes.ppn
+    model_path: /var/lib/hermes-satellite/hey-hermes.ppn
     sensitivity: 0.5      # 0.0-1.0; higher = fewer misses, more false triggers
   ```
 

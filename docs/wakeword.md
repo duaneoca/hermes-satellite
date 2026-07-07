@@ -103,7 +103,7 @@ Use the [automatic training Colab](https://github.com/dscripka/openWakeWord#trai
   "hermit", "heresy", "hey herbie", ...)
 - optionally mix in 20–50 real recordings of your voice from the ReSpeaker mic
 
-Then: `model_path: /etc/hermes-satellite/hey_hermes.onnx`.
+Then: `model_path: /var/lib/hermes-satellite/hey_hermes.onnx`.
 
 ### 5. The strongest lever: a personal verifier
 
@@ -116,14 +116,14 @@ from openwakeword import train_custom_verifier
 train_custom_verifier(
     positive_reference_clips=["me_1.wav", ...],   # 20-50 clips, device mic
     negative_reference_clips=["other_speech.wav", ...],
-    output_path="/etc/hermes-satellite/verifier.pkl",
+    output_path="/var/lib/hermes-satellite/verifier.pkl",
     model_name="hey_hermes",   # must match the wakeword model's name/stem
 )
 ```
 
 ```yaml
 wakeword:
-  verifier_model_path: /etc/hermes-satellite/verifier.pkl
+  verifier_model_path: /var/lib/hermes-satellite/verifier.pkl
   verifier_threshold: 0.3
 ```
 

@@ -158,7 +158,13 @@ guidance, Wi-Fi (WPA3) caveats, and fully-offline install instructions.
    /opt/hermes-satellite/.venv/bin/pip install -e .           # add [pi4] or [pi5]
    ```
 2. Put config at `/etc/hermes-satellite/config.yaml` and (optionally) secrets in
-   `/etc/hermes-satellite/secrets.env`.
+   `/etc/hermes-satellite/secrets.env`. **Models (Piper voice, custom wake
+   word, verifier) are data, not config — they live in
+   `/var/lib/hermes-satellite/`**, owned by the service user:
+   ```bash
+   sudo mkdir -p /var/lib/hermes-satellite
+   sudo chown hermes:hermes /var/lib/hermes-satellite
+   ```
 3. Create the service user and install the unit:
    ```bash
    sudo useradd -r -G spi,audio,gpio hermes

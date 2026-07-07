@@ -37,7 +37,7 @@ wakeword:
   inference_framework: onnx  # onnx | tflite
 
   # ---- porcupine backend only ----
-  # model_path: /etc/hermes-satellite/hey-hermes.ppn   (a .ppn file)
+  # model_path: /var/lib/hermes-satellite/hey-hermes.ppn   (a .ppn file)
   builtin_keyword: ""        # or a built-in: computer, jarvis, ...
   access_key: ""             # Picovoice AccessKey (or PORCUPINE_ACCESS_KEY)
   sensitivity: 0.5
@@ -80,7 +80,7 @@ stt:
 tts:
   backend: piper           # piper | ...
   # Piper voice .onnx model (its .onnx.json config must sit alongside it).
-  voice_path: /etc/hermes-satellite/voice.onnx
+  voice_path: /var/lib/hermes-satellite/voice.onnx
 
 leds:
   backend: apa102          # apa102 | mock
