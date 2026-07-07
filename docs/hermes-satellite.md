@@ -127,6 +127,26 @@ needed.
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
 
+## Network requirements
+
+The daemon opens **no listening ports** — all connections are outbound, so it
+suits a locked-down IoT VLAN:
+
+| Flow | When | Purpose |
+| ---- | ---- | ------- |
+| TCP → Hermes host : 8642 | always | the agent API — the only steady-state need |
+| DNS, NTP | always | name resolution, sane TLS/log timestamps |
+| HTTPS → github.com, pypi.org, files.pythonhosted.org | install/upgrade | clone + pip |
+| HTTPS → github.com (release assets) | first run | openWakeWord model auto-download |
+| HTTPS → download.moonshine.ai | first run | Moonshine STT model auto-download |
+| HTTPS → huggingface.co | setup | Piper voice download (manual) |
+
+On egress-restricted networks, pre-download the models elsewhere and copy them
+over — everything is plain files on disk (openWakeWord →
+`site-packages/openwakeword/resources/models/`, Moonshine →
+`~/.cache/moonshine_voice/`, Piper voice → wherever `tts.voice_path` points).
+After bring-up, a single allow rule (satellite → Hermes:8642) is sufficient.
+
 ## Running as a service
 
 1. Install to `/opt/hermes-satellite` with its own venv:
