@@ -4,10 +4,39 @@
 **OpenAI‑compatible** chat API. This guide documents the exact contract the
 client (`src/hermes_satellite/hermes/client.py`) speaks.
 
-> **Contract source:** this is implemented against the described contract
-> (endpoint, auth header, session‑key header, OpenAI‑shaped body). If the real
-> Hermes API differs, adjust `HermesClient` and this doc together — the client is
+> **Contract source:** verified against a live Hermes API server
+> (2026‑07‑07): endpoint, bearer auth, OpenAI body/response shape and the
+> `hermes-agent` model id all confirmed end‑to‑end from a satellite. If your
+> Hermes differs, adjust `HermesClient` and this doc together — the client is
 > the single integration point.
+
+## Server-side setup (enabling network access on Hermes)
+
+Verified against a live Hermes install (macOS host, 2026‑07‑07). The API
+Server platform is **env-driven** — there is no config.yaml section for it on
+the Hermes side; it auto-enables when `API_SERVER_KEY` exists in
+`~/.hermes/.env`:
+
+```
+API_SERVER_KEY=<openssl rand -hex 32>
+API_SERVER_HOST=0.0.0.0     # REQUIRED for satellites: default binds 127.0.0.1
+# API_SERVER_PORT=8642      # default
+```
+
+then `hermes gateway restart` (env changes don't apply live). Gotchas:
+
+- `API_SERVER_HOST=0.0.0.0` is the line people miss — without it the API is
+  localhost-only and satellites see **connect timeouts**.
+- The server refuses to start without `API_SERVER_KEY` (intentional).
+- Hermes also listens on other ports (dashboard, backend RPC, webhook
+  receivers). Only **8642** is the OpenAI-compatible API — a port that
+  answers `/health` but 404s `/v1/*` is one of the others.
+- **`GET /health` requires no auth** and returns 200 — the perfect
+  reachability probe from a satellite:
+
+  ```bash
+  curl -s -o /dev/null -w "%{http_code}\n" http://<host>:8642/health   # expect 200
+  ```
 
 ## Endpoint
 
@@ -29,6 +58,11 @@ The session key lets each satellite device have its own conversational memory on
 the Hermes side. `HermesClient.send(text, session_key)` uses the per‑call
 `session_key`, falling back to `hermes.session_key` from config when empty.
 
+> **Open contract question:** the Hermes server's own API docs don't mention
+> `X-Hermes-Session-Key`. Unknown headers are harmless, but if your Hermes
+> build doesn't implement session scoping, all satellites share one memory —
+> verify by asking the agent something device-specific from two session keys.
+
 Provide secrets via env vars to keep them out of `config.yaml`:
 
 ```bash
@@ -42,7 +76,7 @@ OpenAI chat‑completions shape, non‑streaming:
 
 ```json
 {
-  "model": "hermes",
+  "model": "hermes-agent",
   "messages": [{ "role": "user", "content": "what time is it" }],
   "stream": false
 }
@@ -81,12 +115,25 @@ curl -sS http://127.0.0.1:8642/v1/chat/completions \
   -H "Authorization: Bearer $HERMES_API_KEY" \
   -H "X-Hermes-Session-Key: test-device" \
   -H "Content-Type: application/json" \
-  -d '{"model":"hermes","messages":[{"role":"user","content":"hello"}],"stream":false}'
+  -d '{"model":"hermes-agent","messages":[{"role":"user","content":"hello"}],"stream":false}'
 ```
 
 You should get a JSON completion back. The unit tests in
 `tests/test_hermes_client.py` assert the client sends exactly these headers and
 body and parses the reply.
+
+## Security posture (from the server's own docs)
+
+- **The bearer key grants full agent access** — terminal and filesystem on
+  the Hermes host. Treat it like a root password: on the satellite it belongs
+  in `/etc/hermes-satellite/secrets.env` (root:root, 600), never in
+  world-readable config.
+- **The API is plain HTTP.** The key crosses the LAN unencrypted on every
+  request — acceptable on a trusted home network path, but if the
+  satellite→Hermes flow crosses segments you don't fully trust, front Hermes
+  with a TLS reverse proxy (Caddy/nginx) and point `hermes.host`/`port` at it.
+- Rotate by editing the server's `.env` + `hermes gateway restart`, then
+  updating `secrets.env` on each satellite.
 
 ## Future: streaming
 

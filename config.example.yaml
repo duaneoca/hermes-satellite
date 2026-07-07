@@ -51,7 +51,7 @@ hermes:
   # (or set HERMES_SESSION_KEY).
   session_key: ""
   # Model name passed in the chat/completions request body.
-  model: hermes
+  model: hermes-agent
   # Request timeout in seconds.
   timeout: 30.0
 

@@ -67,7 +67,7 @@ class HermesConfig:
     port: int = 8642
     api_key: str = ""
     session_key: str = ""
-    model: str = "hermes"
+    model: str = "hermes-agent"
     timeout: float = 30.0
 
 

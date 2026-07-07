@@ -20,6 +20,11 @@ No inbound rules are ever required. Nothing phones home: all HTTPS flows are
 one-time artifact downloads, and audio never leaves the device — only the
 transcribed text goes to your Hermes server.
 
+> **Note on the Hermes flow:** it is plain HTTP carrying a bearer key that
+> grants full agent access on the Hermes host. Keep the satellite→Hermes
+> path within segments you trust, or front Hermes with a TLS reverse proxy
+> — see [hermes-api.md](hermes-api.md#security-posture-from-the-servers-own-docs).
+
 ## Firewall policy
 
 Recommended: default-deny egress for the satellite, plus:
@@ -79,6 +84,6 @@ another machine and never open HTTPS egress:
 | Symptom | Likely cause |
 | ------- | ------------ |
 | First run hangs for minutes, then timeout tracebacks | model auto-download blocked by egress rules — allow HTTPS temporarily or pre-seed |
-| `hermes` client timeouts, wake/STT all fine | satellite → Hermes:8642 rule missing, or `hermes.host` not routable from the VLAN |
+| `hermes` client timeouts, wake/STT all fine | satellite → Hermes:8642 rule missing, `hermes.host` not routable from the VLAN, or Hermes bound to 127.0.0.1 (needs `API_SERVER_HOST=0.0.0.0` server-side). Probe: `curl http://<host>:8642/health` — no auth needed, expect 200 |
 | Works by IP, fails by hostname | IoT VLAN DNS filtered, or an mDNS `.local` name that doesn't cross VLANs |
 | Won't join Wi-Fi at all | WPA3-only SSID — see above |
