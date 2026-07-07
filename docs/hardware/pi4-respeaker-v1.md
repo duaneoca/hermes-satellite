@@ -11,16 +11,36 @@ Profile: `hardware_profile: pi4-respeaker-v1`
 
 See also [seeed-software.md](seeed-software.md) for driver/kernel caveats.
 
-## 1. Audio codec driver (WM8960)
+## 1. Audio codec (WM8960)
 
-The WM8960 needs Seeed's out‑of‑tree driver. **You do NOT need an old
-Raspberry Pi OS** — that advice dates from when only the upstream
-`respeaker/seeed-voicecard` repo existed and it stopped tracking kernels. Use
-current Pi OS with the [HinTak fork](https://github.com/HinTak/seeed-voicecard),
-which maintains a branch per kernel version.
+**You do NOT need an old Raspberry Pi OS**, and on current kernels you may not
+need any out-of-tree driver either. Two routes, best first:
 
-**Clone the branch matching your kernel's major.minor** (this is the step that
-bites people):
+### Option A (recommended): the kernel's built-in overlay — no driver install
+
+The Raspberry Pi kernel ships a `wm8960-soundcard` overlay (present in the
+rpi 6.12/6.15/6.17+ trees; nominally for the Waveshare WM8960 HAT, but the
+ReSpeaker 2-Mic v1 uses the same codec wiring —
+[respeaker/seeed-voicecard#281](https://github.com/respeaker/seeed-voicecard/issues/281)).
+No DKMS module, nothing to rebuild after kernel upgrades:
+
+```bash
+# keep the ALSA card name the Seeed tooling/docs expect:
+echo "dtoverlay=wm8960-soundcard,alsaname=seeed2micvoicec" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+
+After reboot the card should appear in `arecord -l`. The wm8960 driver's mixer
+defaults are conservative — if capture is silent or playback muted, open
+`alsamixer -c seeed2micvoicec` and raise `Capture` / unmute `Headphone` &
+`Speaker`, then persist with `sudo alsactl store`.
+
+### Option B (fallback): Seeed's out-of-tree driver, kernel-matched branch
+
+Use this if Option A misbehaves (e.g. missing mixer routing for your unit) or
+on kernels older than the built-in overlay. The
+[HinTak fork](https://github.com/HinTak/seeed-voicecard) maintains a branch
+per kernel — **clone the branch matching `uname -r`'s major.minor**:
 
 ```bash
 uname -r                   # e.g. 6.12.47+rpt-rpi-v8  ->  branch v6.12
@@ -31,10 +51,11 @@ sudo ./install.sh          # DKMS builds the module; reboot afterwards
 sudo reboot
 ```
 
-> After an `apt full-upgrade` that bumps the kernel's major.minor (e.g. 6.6 →
-> 6.12), re-clone the new matching branch and re-run `install.sh`. If audio
-> disappears after an OS update, this is the first thing to check
-> (`dkms status`).
+> Branch availability lags new kernels (v6.14 was the newest at the time of
+> writing — check `git ls-remote --heads` if unsure). If your kernel is newer
+> than every branch, use Option A. After an `apt full-upgrade` that bumps the
+> kernel's major.minor, re-clone the matching branch and re-run `install.sh`;
+> if audio disappears after an OS update, check `dkms status` first.
 
 Verify after reboot:
 

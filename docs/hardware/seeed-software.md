@@ -19,20 +19,25 @@ kernel caveats that motivated the two hardware profiles.
 
 The two HATs use **different codecs**, which need different software:
 
-| HAT | Codec         | Software                                             |
-| --- | ------------- | ---------------------------------------------------- |
-| v1  | WM8960        | `seeed-voicecard` DKMS out‑of‑tree driver            |
-| v2  | TLV320AIC3104 | **device‑tree overlay** (no DKMS driver)             |
+| HAT | Codec         | Software                                                        |
+| --- | ------------- | --------------------------------------------------------------- |
+| v1  | WM8960        | built-in `wm8960-soundcard` overlay (preferred) or DKMS driver  |
+| v2  | TLV320AIC3104 | **device‑tree overlay** (no DKMS driver)                        |
 
-### v1 / WM8960 / `seeed-voicecard`
+### v1 / WM8960
 
-- Upstream: [`respeaker/seeed-voicecard`](https://github.com/respeaker/seeed-voicecard).
-- **Caveat:** upstream lags current kernels. On recent Raspberry Pi OS
-  (Bookworm, kernel 6.x) use the maintained
-  [HinTak fork](https://github.com/HinTak/seeed-voicecard) (branch per kernel
-  version). The in‑tree `wm8960` codec has bugs the Seeed build fixes, so the
-  module is built via DKMS.
-- If you cannot get DKMS to build, Seeed also publishes a pre‑configured SD image.
+- **Preferred on current kernels:** the Raspberry Pi kernel ships a
+  `wm8960-soundcard` overlay (rpi 6.12+ trees) that works for the 2‑Mic v1
+  ([respeaker/seeed-voicecard#281](https://github.com/respeaker/seeed-voicecard/issues/281)).
+  `dtoverlay=wm8960-soundcard,alsaname=seeed2micvoicec` — no DKMS, survives
+  kernel upgrades. See the [Pi 4 guide](pi4-respeaker-v1.md) Option A.
+- **Fallback:** the `seeed-voicecard` DKMS driver. Upstream
+  [`respeaker/seeed-voicecard`](https://github.com/respeaker/seeed-voicecard)
+  lags current kernels badly; use the maintained
+  [HinTak fork](https://github.com/HinTak/seeed-voicecard) and clone the
+  branch matching `uname -r`'s major.minor. Branches lag brand-new kernels by
+  months (v6.14 newest as of mid‑2026) — another reason to prefer the overlay.
+- If neither works, Seeed also publishes a pre‑configured SD image.
 
 ### v2 / TLV320AIC3104 / overlay
 
