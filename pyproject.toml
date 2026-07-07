@@ -16,13 +16,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Raspberry Pi 4 + ReSpeaker 2-Mic HAT v1 (WM8960). RPi.GPIO for the HAT button.
+# Raspberry Pi 4 + ReSpeaker 2-Mic HAT v1 (WM8960). lgpio for the HAT button
+# (RPi.GPIO edge detection is broken on kernels >= 6.6).
 # webrtcvad-wheels (not webrtcvad): upstream still imports pkg_resources,
 # which setuptools >= 81 removed; the -wheels fork fixes it and ships
 # aarch64 wheels.
 pi4 = [
     "spidev>=3.5",
-    "RPi.GPIO>=0.7",
+    "lgpio>=0.2",
     "openwakeword>=0.6",
     # onnxruntime 1.27.x silently breaks openwakeword streaming detection
     # (batch-1 embedding inference returns garbage -> all scores ~0).

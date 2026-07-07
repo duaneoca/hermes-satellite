@@ -22,8 +22,12 @@ RESPEAKER_LED_COUNT = 3
 RESPEAKER_BUTTON_GPIO = 17
 
 # GPIO backend identifiers.
-GPIO_RPI = "rpi"      # RPi.GPIO — Pi 4 and earlier
-GPIO_LGPIO = "lgpio"  # lgpio — Pi 5 / RP1 (RPi.GPIO is incompatible)
+# NB: RPi.GPIO edge detection is broken on kernels >= ~6.6 (it needed the
+# removed sysfs GPIO interface; symptom: "RuntimeError: Failed to add edge
+# detection"), so lgpio is the default on every profile. The rpi backend
+# remains only for legacy kernels.
+GPIO_RPI = "rpi"      # RPi.GPIO — legacy kernels (< 6.6) only
+GPIO_LGPIO = "lgpio"  # lgpio — works on Pi 4 and Pi 5 (RP1) with current kernels
 GPIO_MOCK = "mock"    # keyboard/no-op — development off-Pi
 
 
@@ -47,9 +51,9 @@ PROFILES: dict[str, HardwareProfile] = {
         led_count=RESPEAKER_LED_COUNT,
         spi_bus=0,
         spi_device=1,
-        gpio_backend=GPIO_RPI,
+        gpio_backend=GPIO_LGPIO,
         button_gpio=RESPEAKER_BUTTON_GPIO,
-        audio_hint="WM8960 via seeed-voicecard (ALSA card 'seeed2micvoicec')",
+        audio_hint="WM8960 via wm8960-soundcard overlay (ALSA card 'seeed2micvoicec')",
     ),
     "pi5-respeaker-v2": HardwareProfile(
         name="pi5-respeaker-v2",

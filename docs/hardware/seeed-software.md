@@ -51,7 +51,8 @@ The two HATs use **different codecs**, which need different software:
 
 The Pi 5 replaced the legacy GPIO/SPI blocks with the **RP1** chip:
 
-- **`RPi.GPIO` is incompatible.** Use `lgpio` (or `gpiozero` on top of it). The
+- **`RPi.GPIO` is incompatible** (and its edge detection is broken on ALL Pis
+  with kernels ≥ ~6.6 — both profiles now default to `lgpio`). The
   `pi5-respeaker-v2` profile selects the `lgpio` button backend.
 - **SPI enumeration differs.** The header SPI can appear as `/dev/spidev10.x`
   instead of `/dev/spidev0.x`. `leds.spi_bus`/`leds.spi_device` are configurable

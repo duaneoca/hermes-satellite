@@ -6,8 +6,8 @@ Profile: `hardware_profile: pi4-respeaker-v1`
 | ------------- | -------------------------------------------------------- |
 | Audio codec   | WM8960 (via `seeed-voicecard` DKMS driver)               |
 | LEDs          | 3× APA102 on SPI0, CE1 → `/dev/spidev0.1`                |
-| Button        | GPIO17 (BCM), active‑low pull‑up, via `RPi.GPIO`         |
-| GPIO backend  | `RPi.GPIO`                                               |
+| Button        | GPIO17 (BCM), active‑low pull‑up, via `lgpio`            |
+| GPIO backend  | `lgpio` (RPi.GPIO edge detection broken on kernels ≥6.6) |
 
 See also [seeed-software.md](seeed-software.md) for driver/kernel caveats.
 
@@ -183,7 +183,10 @@ profile defaults `leds.spi_bus: 0`, `leds.spi_device: 1` accordingly.
 
 ## 3. Button & group membership
 
-GPIO17, handled by `RPi.GPIO` (installed via the `[pi4]` extra). The user
+GPIO17, handled by `lgpio` (installed via the `[pi4]` extra). Do not use
+`RPi.GPIO` here: its edge detection needs the sysfs GPIO interface, which
+kernels ≥ ~6.6 removed — the symptom is `RuntimeError: Failed to add edge
+detection` at startup. The user
 running the daemon needs the `gpio`, `spi`, and `audio` groups. Check and fix:
 
 ```bash
@@ -201,7 +204,7 @@ with them.)
 
 > **Python version check first.** The `[pi4]` extra needs **Python ≤ 3.11**:
 > `tflite-runtime` (pulled in by openwakeword on Linux) publishes aarch64
-> wheels only up to cp311, and `RPi.GPIO` 0.7.1 does not compile on 3.13.
+> wheels only up to cp311.
 >
 > - **Bookworm** (system Python 3.11): use the system Python as below.
 > - **Trixie / Debian 13** (system Python 3.13): create the venv from a

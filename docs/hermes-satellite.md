@@ -26,7 +26,7 @@ playback). Two helper daemon threads run alongside:
 src/hermes_satellite/
   config.py     # YAML schema + loader + env overrides
   platform.py   # hardware profiles (SPI numbering, GPIO backend, LED count)
-  button.py     # Mute state + HAT button watcher (RPi.GPIO / lgpio / mock)
+  button.py     # Mute state + HAT button watcher (lgpio / legacy RPi.GPIO / mock)
   app.py        # SatelliteApp: builds everything, owns lifecycle & LED glue
   cli.py        # argument parsing / entry point
   core/
