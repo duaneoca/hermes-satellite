@@ -51,9 +51,11 @@ sudo ./install.sh          # DKMS builds the module; reboot afterwards
 sudo reboot
 ```
 
-> Branch availability lags new kernels (v6.14 was the newest at the time of
-> writing — check `git ls-remote --heads` if unsure). If your kernel is newer
-> than every branch, use Option A. After an `apt full-upgrade` that bumps the
+> Branch availability lags new kernels significantly: at the time of writing,
+> Raspberry Pi OS Trixie ships kernel **6.18** (`6.18.34+rpt-rpi-v8`) while the
+> newest branch was **v6.14** (check with
+> `git ls-remote --heads https://github.com/HinTak/seeed-voicecard`). If your
+> kernel is newer than every branch, use Option A. After an `apt full-upgrade` that bumps the
 > kernel's major.minor, re-clone the matching branch and re-run `install.sh`;
 > if audio disappears after an OS update, check `dkms status` first.
 
