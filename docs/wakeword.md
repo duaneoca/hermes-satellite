@@ -64,7 +64,10 @@ distances; let the room be normally noisy (TV, music, conversation) for a
 while. Pick `threshold` comfortably below your spoken peaks and above the
 ambient ones.
 
-Measured example (synthetic, `hey_jarvis`): true phrase peaks 0.97–0.99;
+Measured on-device (Pi 4 + 2-Mic HAT v1, ~2 m, calibrated mic chain,
+`hey_jarvis`): spoken phrase scores **0.98–1.00**, ambient room ≤ 0.05 —
+with that separation, 0.6 is a comfortable threshold. Synthetic-loopback
+measurements agree: true phrase peaks 0.97–0.99;
 phonetic attack "hey jar of peanut butter" peaks 0.75–0.89; unrelated speech
 0.00–0.04. Default 0.5 accepts the attack; 0.9 rejects it and still fires
 reliably. **Real voices typically score lower than synthetic ones** (the
