@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-satellite"
+version = "0.1.0"
+description = "Voice satellite bridging Porcupine wake word detection to a Hermes agent backend"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Duane" }]
+dependencies = [
+    "PyYAML>=5.4",
+    "requests>=2.25",
+]
+
+[project.optional-dependencies]
+# Raspberry Pi 4 + ReSpeaker 2-Mic HAT v1 (WM8960). RPi.GPIO for the HAT button.
+# webrtcvad-wheels (not webrtcvad): upstream still imports pkg_resources,
+# which setuptools >= 81 removed; the -wheels fork fixes it and ships
+# aarch64 wheels.
+pi4 = [
+    "spidev>=3.5",
+    "RPi.GPIO>=0.7",
+    "openwakeword>=0.6",
+    # onnxruntime 1.27.x silently breaks openwakeword streaming detection
+    # (batch-1 embedding inference returns garbage -> all scores ~0).
+    # Verified good: 1.20-1.26. See docs/wakeword.md#onnxruntime-pin
+    "onnxruntime>=1.15,<1.27",
+    "pvporcupine>=3.0",
+    # NB: PyPI dist versions are 0.0.x even though __version__ says 0.1.0
+    "moonshine-voice>=0.0.59",
+    "piper-tts>=1.2",
+    "sounddevice>=0.4",
+    "webrtcvad-wheels>=2.0.14",
+]
+# Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 (TLV320AIC3104). RP1 => lgpio for the button.
+pi5 = [
+    "spidev>=3.5",
+    "lgpio>=0.2",
+    "openwakeword>=0.6",
+    # onnxruntime 1.27.x silently breaks openwakeword streaming detection
+    # (batch-1 embedding inference returns garbage -> all scores ~0).
+    # Verified good: 1.20-1.26. See docs/wakeword.md#onnxruntime-pin
+    "onnxruntime>=1.15,<1.27",
+    "pvporcupine>=3.0",
+    # NB: PyPI dist versions are 0.0.x even though __version__ says 0.1.0
+    "moonshine-voice>=0.0.59",
+    "piper-tts>=1.2",
+    "sounddevice>=0.4",
+    "webrtcvad-wheels>=2.0.14",
+]
+dev = [
+    "pytest>=7.0",
+    "responses>=0.23",
+]
+
+[project.scripts]
+hermes-satellite = "hermes_satellite.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

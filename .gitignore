@@ -1,0 +1,30 @@
+# Local runtime config (may contain secrets) — copy config.example.yaml -> config.yaml
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Models / voices (large binaries, fetched per-device)
+*.ppn
+*.onnx
+*.onnx.json
+models/
+voices/
+
+# Test / tooling
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+
+# Claude Code local settings
+.claude/

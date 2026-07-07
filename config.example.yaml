@@ -1,0 +1,87 @@
+# hermes-satellite configuration template.
+#
+# Copy to config.yaml and edit for your device:
+#     cp config.example.yaml config.yaml
+#
+# Secrets can be left blank here and supplied via environment variables instead:
+#     HERMES_API_KEY, HERMES_SESSION_KEY, PORCUPINE_ACCESS_KEY
+# Env vars override any value set in this file.
+
+# Hardware profile selects sane defaults for SPI numbering, GPIO backend and
+# audio devices. Supported: pi4-respeaker-v1 | pi5-respeaker-v2 | mock
+# Use "mock" for development on a machine without the HAT (e.g. a laptop).
+hardware_profile: pi5-respeaker-v2
+
+wakeword:
+  # openwakeword (default, free) | porcupine (needs a paid Picovoice key)
+  backend: openwakeword
+  # openwakeword: a pretrained name (hey_jarvis, alexa, hey_mycroft,
+  # hey_rhasspy) or an absolute path to a custom-trained .onnx ("Hey Hermes").
+  # Pretrained files auto-download on first run.
+  model_path: hey_jarvis
+  # ---- tuning levers (see docs/wakeword.md; calibrate with --ww-monitor) ----
+  threshold: 0.5             # detection threshold on the 0-1 score
+  patience_frames: 1         # consecutive 80ms frames over threshold to fire
+  refractory_seconds: 2.0    # suppress re-triggers after a detection
+  vad_threshold: 0.0         # >0 enables Silero VAD gate (e.g. 0.5)
+  noise_suppression: false   # SpeexDSP (Linux; needs libspeexdsp)
+  # Second-stage verifier trained on your own voice recordings — the
+  # strongest false-accept fix (docs/wakeword.md#custom-verifier):
+  verifier_model_path: ""
+  verifier_threshold: 0.1
+  inference_framework: onnx  # onnx | tflite
+
+  # ---- porcupine backend only ----
+  # model_path: /etc/hermes-satellite/hey-hermes.ppn   (a .ppn file)
+  builtin_keyword: ""        # or a built-in: computer, jarvis, ...
+  access_key: ""             # Picovoice AccessKey (or PORCUPINE_ACCESS_KEY)
+  sensitivity: 0.5
+
+hermes:
+  host: 127.0.0.1
+  port: 8642
+  # Bearer token for the Hermes API (or set HERMES_API_KEY).
+  api_key: ""
+  # Per-device memory scoping key, sent as X-Hermes-Session-Key
+  # (or set HERMES_SESSION_KEY).
+  session_key: ""
+  # Model name passed in the chat/completions request body.
+  model: hermes
+  # Request timeout in seconds.
+  timeout: 30.0
+
+audio:
+  backend: alsa            # alsa | mock
+  input_device: null       # ALSA/PortAudio device index, or null for default
+  output_device: null
+  sample_rate: 16000       # Porcupine + Moonshine operate at 16 kHz
+  # Capture channels. The ReSpeaker seeed cards often only open in stereo;
+  # set 2 and the left mic (channel 0) is used.
+  input_channels: 1
+  # webrtcvad aggressiveness 0-3 (higher = more aggressive filtering).
+  vad_aggressiveness: 2
+  # End the utterance after this much trailing silence.
+  silence_ms: 800
+  # Give up if no speech starts within this window after the wake word.
+  speech_timeout_seconds: 5.0
+  # Hard cap on a single utterance.
+  max_record_seconds: 10.0
+
+stt:
+  backend: moonshine       # moonshine | ...
+  model: moonshine/base    # moonshine/tiny | moonshine/base
+  language: en
+
+tts:
+  backend: piper           # piper | ...
+  # Piper voice .onnx model (its .onnx.json config must sit alongside it).
+  voice_path: /etc/hermes-satellite/voice.onnx
+
+leds:
+  backend: apa102          # apa102 | mock
+  # Global brightness 0-31 for the APA102 LEDs.
+  brightness: 8
+  # SPI bus/device for the on-board APA102 ring. Defaulted from the hardware
+  # profile if omitted (Pi 4: bus 0 dev 1; Pi 5: bus 0 dev 0 => spidev10.0).
+  spi_bus: null
+  spi_device: null

@@ -1,0 +1,30 @@
+[Unit]
+Description=hermes-satellite voice front-end for Hermes
+# Wait for sound devices (ALSA codec driver / device-tree overlay) to be ready.
+After=sound.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Dedicated unprivileged user; must be in the spi, audio and gpio groups so it
+# can drive the APA102 LEDs (SPI), the microphone/speaker (ALSA) and the HAT
+# button (GPIO). Create with:
+#   sudo useradd -r -G spi,audio,gpio hermes
+User=hermes
+Group=hermes
+SupplementaryGroups=spi audio gpio
+
+# Adjust paths to your install. The venv is created at /opt/hermes-satellite.
+WorkingDirectory=/opt/hermes-satellite
+ExecStart=/opt/hermes-satellite/.venv/bin/python -m hermes_satellite \
+    --config /etc/hermes-satellite/config.yaml
+# Secrets can be provided out-of-band instead of in config.yaml:
+#   EnvironmentFile=/etc/hermes-satellite/secrets.env
+# containing HERMES_API_KEY=..., HERMES_SESSION_KEY=..., PORCUPINE_ACCESS_KEY=...
+EnvironmentFile=-/etc/hermes-satellite/secrets.env
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
