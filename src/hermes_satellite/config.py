@@ -121,6 +121,9 @@ class Config:
     stt: STTConfig = field(default_factory=STTConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     leds: LEDConfig = field(default_factory=LEDConfig)
+    # Daemon log level (DEBUG|INFO|WARNING|ERROR). WARNING keeps a deployed
+    # satellite near-silent in the journal; the --log-level CLI flag overrides.
+    log_level: str = "INFO"
 
 
 def _section(data: dict, key: str) -> dict:
@@ -178,6 +181,13 @@ def _build(data: dict, profile_override: Optional[str] = None) -> Config:
     if leds.spi_device is None:
         leds.spi_device = profile.spi_device
 
+    log_level = str(data.get("log_level", "INFO")).upper()
+    if log_level not in ("DEBUG", "INFO", "WARNING", "ERROR"):
+        raise ConfigError(
+            f"Invalid log_level: {data.get('log_level')!r} "
+            "(DEBUG | INFO | WARNING | ERROR)"
+        )
+
     config = Config(
         hardware_profile=profile.name,
         profile=profile,
@@ -187,6 +197,7 @@ def _build(data: dict, profile_override: Optional[str] = None) -> Config:
         stt=stt,
         tts=tts,
         leds=leds,
+        log_level=log_level,
     )
     _apply_env_overrides(config)
     return config

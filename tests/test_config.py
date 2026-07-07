@@ -164,3 +164,20 @@ def test_explicit_led_spi_overrides_profile(tmp_path):
 def test_missing_file_raises():
     with pytest.raises(ConfigError):
         load_config("/nonexistent/config.yaml")
+
+
+def test_log_level_parses_and_validates(tmp_path):
+    cfg = load_config(_write(tmp_path, """
+        hardware_profile: mock
+        log_level: warning
+        wakeword:
+          model_path: hey_jarvis
+    """))
+    assert cfg.log_level == "WARNING"
+    with pytest.raises(ConfigError, match="log_level"):
+        load_config(_write(tmp_path, """
+            hardware_profile: mock
+            log_level: chatty
+            wakeword:
+              model_path: hey_jarvis
+        """))

@@ -12,6 +12,11 @@
 # Use "mock" for development on a machine without the HAT (e.g. a laptop).
 hardware_profile: pi5-respeaker-v2
 
+# Daemon log verbosity: DEBUG | INFO | WARNING | ERROR.
+# WARNING is recommended for deployed satellites: near-silent in the
+# journal (errors only), minimal SD-card write pressure.
+log_level: INFO
+
 wakeword:
   # openwakeword (default, free) | porcupine (needs a paid Picovoice key)
   backend: openwakeword

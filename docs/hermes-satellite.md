@@ -128,6 +128,19 @@ needed.
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
 
+## Logging & SD-card wear
+
+- The daemon logs via Python logging to stderr → **journald** under
+  systemd. Set `log_level: WARNING` in config for a deployed satellite —
+  errors only, near-zero steady-state writes (`--log-level` on the CLI
+  overrides for a debugging session).
+- The chatty outputs (`--ww-monitor` score/level lines, `--demo`
+  transitions at INFO) are interactive tools, not service behavior.
+- Raspberry Pi OS defaults journald to **volatile (RAM) storage** unless
+  `/var/log/journal` exists — check with `journalctl --disk-usage`. If
+  you enabled persistent journals, cap them (`SystemMaxUse=64M` in
+  `/etc/systemd/journald.conf`) to protect the SD card.
+
 ## Network requirements
 
 The daemon opens **no listening ports**; all connections are outbound, and

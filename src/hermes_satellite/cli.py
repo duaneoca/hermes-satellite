@@ -20,8 +20,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--config", "-c", default="config.yaml", help="path to config.yaml"
     )
     parser.add_argument(
-        "--log-level", default="INFO",
-        help="logging level (DEBUG, INFO, WARNING, ERROR)",
+        "--log-level", default=None,
+        help="logging level (DEBUG, INFO, WARNING, ERROR); "
+             "overrides log_level from config.yaml",
     )
     parser.add_argument(
         "--hardware-profile",
@@ -110,15 +111,18 @@ def _run_ww_monitor(config) -> int:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-    )
     try:
         config = load_config(args.config, profile_override=args.hardware_profile)
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
+
+    # CLI flag overrides config; config defaults to INFO.
+    level = (args.log_level or config.log_level).upper()
+    logging.basicConfig(
+        level=getattr(logging, level, logging.INFO),
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    )
 
     if args.ww_monitor:
         return _run_ww_monitor(config)
