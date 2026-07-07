@@ -110,10 +110,26 @@ with them.)
 
 ## 4. Install & run
 
+> **Python version check first.** The `[pi4]` extra needs **Python ≤ 3.11**:
+> `tflite-runtime` (pulled in by openwakeword on Linux) publishes aarch64
+> wheels only up to cp311, and `RPi.GPIO` 0.7.1 does not compile on 3.13.
+>
+> - **Bookworm** (system Python 3.11): use the system Python as below.
+> - **Trixie / Debian 13** (system Python 3.13): create the venv from a
+>   [uv](https://docs.astral.sh/uv/)-managed Python 3.11 instead:
+>
+>   ```bash
+>   curl -LsSf https://astral.sh/uv/install.sh | sh   # installs to ~/.local/bin
+>   uv python install 3.11
+>   uv venv --seed --python 3.11 .venv     # --seed puts pip in the venv
+>   ```
+>
+>   then continue with `source .venv/bin/activate` and the pip steps below.
+
 ```bash
 git clone https://github.com/duaneoca/hermes-satellite.git
 cd hermes-satellite
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Bookworm; Trixie: see note above
 pip install --upgrade pip setuptools wheel   # REQUIRED on Raspberry Pi OS:
     # its bundled pip is too old for pyproject.toml editable installs and
     # fails with: 'File "setup.py" not found ... editable mode currently

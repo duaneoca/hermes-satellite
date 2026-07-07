@@ -97,10 +97,17 @@ exit                   # group changes take effect on next login; re-check
 
 ## 4. Install & run
 
+> **Python version check first.** The `[pi5]` extra needs **Python ≤ 3.11**
+> (`tflite-runtime`, pulled in by openwakeword, has no aarch64 wheels past
+> cp311). On **Trixie / Debian 13** (system Python 3.13), create the venv from
+> a uv-managed Python 3.11 — see the identical note in
+> [pi4-respeaker-v1.md](pi4-respeaker-v1.md#4-install--run). Bookworm's
+> system Python 3.11 is fine as-is.
+
 ```bash
 git clone https://github.com/duaneoca/hermes-satellite.git
 cd hermes-satellite
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Bookworm; Trixie: see note above
 pip install --upgrade pip setuptools wheel   # Raspberry Pi OS pip is too old
     # for pyproject.toml editable installs ('File "setup.py" not found ...')
 pip install -e ".[pi5]"
