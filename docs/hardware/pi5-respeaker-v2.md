@@ -105,6 +105,8 @@ exit                   # group changes take effect on next login; re-check
 > system Python 3.11 is fine as-is.
 
 ```bash
+sudo apt install -y libportaudio2   # PortAudio: required by sounddevice on Linux
+    # (missing => 'OSError: PortAudio library not found' at first audio use)
 git clone https://github.com/duaneoca/hermes-satellite.git
 cd hermes-satellite
 python -m venv .venv && source .venv/bin/activate   # Bookworm; Trixie: see note above
