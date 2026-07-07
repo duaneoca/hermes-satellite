@@ -27,6 +27,14 @@ ExecStart=/opt/hermes-satellite/.venv/bin/python -m hermes_satellite \
 # containing HERMES_API_KEY=..., HERMES_SESSION_KEY=..., PORCUPINE_ACCESS_KEY=...
 EnvironmentFile=-/etc/hermes-satellite/secrets.env
 
+# The service user has no home directory, so point XDG caches (Moonshine's
+# ~80 MB STT model lives in $XDG_CACHE_HOME/moonshine_voice) at the app's
+# data directory. Pre-seed it to avoid a download at first service start:
+#   sudo -u hermes XDG_CACHE_HOME=/var/lib/hermes-satellite/cache \
+#     /opt/hermes-satellite/.venv/bin/python -c \
+#     "import moonshine_voice as mv; mv.get_model_for_language('en', mv.ModelArch.BASE)"
+Environment=XDG_CACHE_HOME=/var/lib/hermes-satellite/cache
+
 Restart=on-failure
 RestartSec=3
 

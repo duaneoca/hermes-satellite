@@ -69,7 +69,9 @@ another machine and never open HTTPS egress:
   `<venv>/lib/python*/site-packages/openwakeword/resources/models/`, or point
   `wakeword.model_path` at an absolute path.
 - **Moonshine model:** copy the cache directory `~/.cache/moonshine_voice/`
-  from a machine that has run it once.
+  from a machine that has run it once (for the systemd service, the
+  destination is `/var/lib/hermes-satellite/cache/moonshine_voice/` — the
+  unit sets `XDG_CACHE_HOME`).
 - **Piper voice:** any path; set `tts.voice_path`.
 
 ## Failure signatures (segmented-network edition)

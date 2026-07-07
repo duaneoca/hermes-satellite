@@ -165,7 +165,13 @@ guidance, Wi-Fi (WPA3) caveats, and fully-offline install instructions.
    sudo mkdir -p /var/lib/hermes-satellite
    sudo chown hermes:hermes /var/lib/hermes-satellite
    ```
-3. Create the service user and install the unit:
+3. The unit sets `XDG_CACHE_HOME=/var/lib/hermes-satellite/cache` because
+   the service user has no home directory — Moonshine's STT model cache
+   (~80 MB) lands there. Pre-seed it so the first service start doesn't
+   need egress (command in the unit's comments), or copy an existing
+   cache: `~/.cache/moonshine_voice/` → 
+   `/var/lib/hermes-satellite/cache/moonshine_voice/`.
+4. Create the service user and install the unit:
    ```bash
    sudo useradd -r -G spi,audio,gpio hermes
    sudo cp systemd/hermes-satellite.service /etc/systemd/system/
