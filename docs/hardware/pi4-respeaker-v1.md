@@ -63,14 +63,28 @@ aplay  -D plughw:$C test.wav                            # room, then Ctrl-C
 python3 - <<'EOF'
 import wave, array
 w = wave.open("test.wav")
+rate = w.getframerate()
 data = array.array('h', w.readframes(w.getnframes()))
-peak = max((abs(s) for s in data), default=0)
-print(f"peak {100*peak/32767:.1f}% of full scale")
+for name, ch in (("LEFT", data[0::2]), ("RIGHT", data[1::2])):
+    a = sorted(abs(s) for s in ch)
+    n = len(a)
+    imax = max(range(len(ch)), key=lambda i: abs(ch[i]))
+    print(f"{name}: p99 {100*a[int(n*0.99)]/32767:.0f}%  "
+          f"peak {100*a[-1]/32767:.0f}% (at t={imax/rate:.2f}s)  "
+          f"samples>95%: {sum(1 for s in a if s > 31000)}")
 EOF
 ```
 
-Speech from your normal talking distance should peak **~30-70%**. Calibration
-rules learned the hard way:
+**Read the p99 number, not the peak.** Opening the capture device produces a
+~15 ms full-scale pop at t=0.00 on this codec, which pins any peak-only
+measurement at 100% regardless of your gain settings (it cost this guide's
+authors an hour). The pop is harmless in practice — the daemon opens the mic
+once at startup and holds it. A healthy take shows the max at t≈0.00, a small
+`samples>95%` count, and matched L/R p99 values.
+
+Speech from your normal talking distance should land **p99 ≈ 30-70%**.
+Field-verified endpoint on a 2-Mic v1 at ~2 m: `Capture` 63, `ADC PCM` 220 →
+p99 ≈ 34%. Calibration rules learned the hard way:
 
 - **Keep takes comparable**: same phrase, same distance, same voice level —
   position dominates everything (close-talking vs across the room is 20+ dB,
@@ -79,8 +93,8 @@ rules learned the hard way:
   clamps larger values. `ADC PCM` (digital) is 0-255, 195 = 0 dB, 0.5 dB/step.
 - **At conversational distance these mics need lots of gain**: expect to run
   `Capture` at or near 63 and then tune with `ADC PCM` (start ~220 = +12.5 dB;
-  ±10 steps = ±5 dB) until speech peaks 30-70%. Close-mic use is the opposite:
-  back `Capture` off first.
+  ±10 steps = ±5 dB) until speech lands p99 ≈ 30-70%. Close-mic use is the
+  opposite: back `Capture` off first.
 - **If raising gain doesn't raise the peak**, check the automatic level
   control isn't overriding the PGA: `amixer -c $C sget 'ALC Function'` must be
   `None` (`amixer -c $C sset 'ALC Function' None`).
