@@ -13,17 +13,28 @@ See also [seeed-software.md](seeed-software.md) for driver/kernel caveats.
 
 ## 1. Audio codec driver (WM8960)
 
-The WM8960 needs Seeed's out‑of‑tree driver. On current Raspberry Pi OS kernels
-use the [HinTak fork](https://github.com/HinTak/seeed-voicecard) (the upstream
-`respeaker/seeed-voicecard` lags newer kernels):
+The WM8960 needs Seeed's out‑of‑tree driver. **You do NOT need an old
+Raspberry Pi OS** — that advice dates from when only the upstream
+`respeaker/seeed-voicecard` repo existed and it stopped tracking kernels. Use
+current Pi OS with the [HinTak fork](https://github.com/HinTak/seeed-voicecard),
+which maintains a branch per kernel version.
+
+**Clone the branch matching your kernel's major.minor** (this is the step that
+bites people):
 
 ```bash
+uname -r                   # e.g. 6.12.47+rpt-rpi-v8  ->  branch v6.12
 sudo apt-get update && sudo apt-get install -y git dkms
-git clone https://github.com/HinTak/seeed-voicecard
+git clone -b v6.12 https://github.com/HinTak/seeed-voicecard   # match uname -r!
 cd seeed-voicecard
 sudo ./install.sh          # DKMS builds the module; reboot afterwards
 sudo reboot
 ```
+
+> After an `apt full-upgrade` that bumps the kernel's major.minor (e.g. 6.6 →
+> 6.12), re-clone the new matching branch and re-run `install.sh`. If audio
+> disappears after an OS update, this is the first thing to check
+> (`dkms status`).
 
 Verify after reboot:
 
