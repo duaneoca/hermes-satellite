@@ -30,10 +30,48 @@ echo "dtoverlay=wm8960-soundcard,alsaname=seeed2micvoicec" | sudo tee -a /boot/f
 sudo reboot
 ```
 
-After reboot the card should appear in `arecord -l`. The wm8960 driver's mixer
-defaults are conservative — if capture is silent or playback muted, open
-`alsamixer -c seeed2micvoicec` and raise `Capture` / unmute `Headphone` &
-`Speaker`, then persist with `sudo alsactl store`.
+After reboot the card should appear in `arecord -l`. **The mainline wm8960
+driver defaults most of the audio-path switches OFF** — capture records
+silence and playback is inaudible until you wire the paths up. This recipe is
+field-verified (Pi 4, kernel 6.18, ReSpeaker 2-Mic v1):
+
+```bash
+C="seeed2micvoicec"
+# capture path: mic -> LINPUT1/RINPUT1 -> boost mixer -> PGA -> ADC
+amixer -c $C sset 'Left Input Mixer Boost' on
+amixer -c $C sset 'Right Input Mixer Boost' on
+amixer -c $C sset 'Left Boost Mixer LINPUT1' on
+amixer -c $C sset 'Right Boost Mixer RINPUT1' on
+amixer -c $C sset 'Capture' 40 cap      # input PGA ~ +12.75 dB, capture enabled
+amixer -c $C sset 'ADC PCM' 195         # digital capture volume, 195 = 0 dB
+# playback path: DAC -> output mixer -> speaker/headphone
+amixer -c $C sset 'Left Output Mixer PCM' on
+amixer -c $C sset 'Right Output Mixer PCM' on
+amixer -c $C sset 'Playback' 255        # DAC digital volume
+amixer -c $C sset 'Speaker' 121         # JST speaker; 121 = 0 dB (the scale is
+amixer -c $C sset 'Headphone' 110       # very logarithmic: 70% is -32 dB!)
+amixer -c $C sset 'Speaker DC' 5        # class-D boost 0-5; low values = quiet
+amixer -c $C sset 'Speaker AC' 5
+```
+
+Loop-test and **check the capture level** — clipping silently ruins wake-word
+and STT accuracy:
+
+```bash
+arecord -D plughw:$C -f S16_LE -r 16000 -c 2 test.wav   # talk from across the
+aplay  -D plughw:$C test.wav                            # room, then Ctrl-C
+python3 - <<'EOF'
+import wave, array
+w = wave.open("test.wav")
+data = array.array('h', w.readframes(w.getnframes()))
+peak = max((abs(s) for s in data), default=0)
+print(f"peak {100*peak/32767:.1f}% of full scale")
+EOF
+```
+
+Speech from your normal talking distance should peak **~30-70%**. Under ~20%:
+raise `Capture` in steps of 5. At 95-100% (clipping): lower it. When it lands
+in range, persist everything: `sudo alsactl store`.
 
 ### Option B (fallback): Seeed's out-of-tree driver, kernel-matched branch
 
