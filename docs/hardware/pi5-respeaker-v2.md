@@ -108,6 +108,10 @@ exit                   # group changes take effect on next login; re-check
 git clone https://github.com/duaneoca/hermes-satellite.git
 cd hermes-satellite
 python -m venv .venv && source .venv/bin/activate   # Bookworm; Trixie: see note above
+python -c 'import sys; sys.exit(sys.version_info >= (3,12))' || \
+  { echo "Python 3.12+ venv — STOP: recreate it per the Trixie note above"; }
+    # If that printed STOP, do not continue: the install will fail with
+    # 'No matching distribution found for tflite-runtime'.
 pip install --upgrade pip setuptools wheel   # Raspberry Pi OS pip is too old
     # for pyproject.toml editable installs ('File "setup.py" not found ...')
 pip install -e ".[pi5]"
