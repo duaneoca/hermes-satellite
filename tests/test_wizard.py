@@ -114,9 +114,12 @@ def test_mixer_route_parses_card_alongside_token(wizard, monkeypatch):
     (the page once produced ?card=3?token=..., which 403'd)."""
     from hermes_satellite.wizard import mixer as mixer_mod
     seen = {}
-    monkeypatch.setattr(mixer_mod, "get_controls",
-                        lambda card: seen.setdefault("card", card) or
-                        {"Capture": {"value": 40, "max": 63, "switch": "on"}})
+
+    def fake_get_controls(card):
+        seen["card"] = card
+        return {"Capture": {"value": 40, "max": 63, "switch": "on"}}
+
+    monkeypatch.setattr(mixer_mod, "get_controls", fake_get_controls)
     state, base = wizard
     code, body = _get(f"{base}/api/mixer?card=3&token={state.token}")
     assert code == 200
