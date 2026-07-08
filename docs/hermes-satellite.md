@@ -251,6 +251,24 @@ stays your user's and is unrelated to the deployed copy.
    journalctl -u hermes-satellite -f
    ```
 
+### Day-2 operations
+
+Two helper scripts wrap the routine chores on a deployed satellite —
+each stops the daemon only if it is running and restarts it only if it
+was (symlink them into your home directory for convenience):
+
+```bash
+ln -s /opt/hermes-satellite/scripts/configure-satellite.sh ~/configure-satellite
+ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
+```
+
+* `~/configure-satellite` — runs the [setup wizard](setup-wizard.md)
+  against the live `/etc/hermes-satellite/config.yaml`.
+* `~/update-satellite` — pulls the latest revision into `/opt`,
+  reinstalls into the venv (auto-detects the `[pi4]`/`[pi5]` extra from
+  the board, so new dependencies land too), and shows the service status
+  after restart. No-op if already at the latest revision.
+
 ## Testing / verification
 
 - `pytest` — state machine, LED controller, Hermes client, config.

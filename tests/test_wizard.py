@@ -429,3 +429,47 @@ def test_save_quotes_secrets_with_spaces(wizard):
     # round-trip through the loader
     from hermes_satellite.config import load_config
     assert load_config(state.config_path).mqtt.password == "has spaces #and hash"
+
+
+def test_behavior_prefill_reflects_config(wizard):
+    state, base = wizard
+    _, body = _get(f"{base}/api/behavior?token={state.token}")
+    assert body["stream"] is True          # hermes.stream default
+    assert body["follow_up"] is False      # conversation default
+    assert body["follow_up_seconds"] == 6.0
+    assert body["max_turns"] == 8
+    assert body["earcons"] is True
+    assert body["earcon_volume"] == 0.5
+
+
+def test_behavior_config_pends_and_applies_live(wizard):
+    state, base = wizard
+    # numbers arrive as strings from the page's inputs
+    _post(f"{base}/api/behavior/config?token={state.token}",
+          {"follow_up": True, "follow_up_seconds": "8",
+           "max_turns": "4", "earcon_volume": "0.3", "stream": False})
+    assert state.config.conversation.follow_up is True
+    assert state.config.conversation.follow_up_seconds == 8.0
+    assert state.config.conversation.max_turns == 4
+    assert state.config.earcons.volume == 0.3
+    assert state.config.hermes.stream is False
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["conversation.follow_up"] is True
+    assert pending["hermes.stream"] is False
+    # partial updates leave the rest alone
+    _post(f"{base}/api/behavior/config?token={state.token}",
+          {"earcons": False})
+    assert state.config.earcons.enabled is False
+    assert state.config.conversation.max_turns == 4
+
+
+def test_page_has_conversation_section(wizard):
+    """Regression: the earcons/follow-up/streaming settings shipped without
+    any wizard UI — the page must render the section and its controls."""
+    state, base = wizard
+    with urllib.request.urlopen(f"{base}/?token={state.token}") as r:
+        html = r.read().decode()
+    assert "Conversation" in html
+    for element_id in ("bs", "bf", "bw", "bt", "be", "bv"):
+        assert f'id="{element_id}"' in html
+    assert "/api/behavior" in html

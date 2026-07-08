@@ -107,7 +107,28 @@ behind your back.</p>
   <p id="hres"></p>
 </section>
 
-<h2>7 · Home Assistant (MQTT)</h2>
+<h2>7 · Conversation &amp; sounds</h2>
+<section>
+  <label><input id="bs" type="checkbox" onchange="behavior({stream: this.checked})">
+    Streamed replies — start speaking before the full answer has arrived</label><br>
+  <label><input id="bf" type="checkbox" onchange="behavior({follow_up: this.checked})">
+    Follow-up mode — after a reply, keep listening briefly so you can
+    continue without the wake word</label><br>
+  <label class="muted">Follow-up window
+    <input id="bw" type="number" min="2" max="30" step="0.5" style="width:5rem"
+      onchange="behavior({follow_up_seconds: this.value})"> seconds</label>
+  <label class="muted">Max turns per conversation
+    <input id="bt" type="number" min="1" max="50" style="width:4rem"
+      onchange="behavior({max_turns: this.value})"></label><br>
+  <label><input id="be" type="checkbox" onchange="behavior({earcons: this.checked})">
+    Sound cues — chime on wake, blip when the follow-up window opens,
+    tone on error</label>
+  <label class="muted">Cue volume
+    <input id="bv" type="number" min="0" max="1" step="0.1" style="width:4.5rem"
+      onchange="behavior({earcon_volume: this.value})"></label>
+</section>
+
+<h2>8 · Home Assistant (MQTT)</h2>
 <section>
   <p class="muted">Optional: the satellite appears in Home Assistant with a
   mute switch, volume/threshold sliders, voice select and a wake-word event —
@@ -126,7 +147,7 @@ behind your back.</p>
   <p class="muted">Device will appear in HA as <b id="mid"></b>.</p>
 </section>
 
-<h2>8 · Review &amp; save</h2>
+<h2>9 · Review &amp; save</h2>
 <section>
   <pre id="pending">(no changes yet)</pre>
   <button onclick="save()">Save configuration</button>
@@ -320,6 +341,19 @@ function loadHermes() {
       : "no key configured";
   });
 }
+function behavior(change) {
+  post("/api/behavior/config", change).then(loadPending);
+}
+function loadBehavior() {
+  get("/api/behavior").then(b => {
+    document.getElementById("bs").checked = b.stream;
+    document.getElementById("bf").checked = b.follow_up;
+    document.getElementById("bw").value = b.follow_up_seconds;
+    document.getElementById("bt").value = b.max_turns;
+    document.getElementById("be").checked = b.earcons;
+    document.getElementById("bv").value = b.earcon_volume;
+  });
+}
 function loadMqtt() {
   get("/api/mqtt").then(m => {
     document.getElementById("me").checked = m.enabled;
@@ -373,7 +407,7 @@ function save() {
         "restart the daemon to apply.";
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadMqtt();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt();
 </script>
 </body>
 </html>

@@ -16,6 +16,8 @@ Endpoints (all require the one-time token via ``?token=`` or
   GET  /api/voices            downloaded + catalog voices
   POST /api/voices/preview    {name, speaker_id, length_scale, text}
   GET  /api/pending           accumulated changes
+  GET  /api/behavior          streaming / follow-up / earcon settings
+  POST /api/behavior/config   any subset of the /api/behavior fields
   POST /api/hermes/test       {host, port, api_key, session_key} -> health+chat
   POST /api/save              write <config>.new; returns paths + mv command
   POST /api/exit              shut the wizard down
@@ -503,6 +505,14 @@ def _make_handler(state: WizardState):
                 self._json({"host": hermes.host, "port": hermes.port,
                             "session_key": hermes.session_key,
                             "api_key_hint": hint})
+            elif route == "/api/behavior":
+                conv = state.config.conversation
+                self._json({"stream": state.config.hermes.stream,
+                            "follow_up": conv.follow_up,
+                            "follow_up_seconds": conv.follow_up_seconds,
+                            "max_turns": conv.max_turns,
+                            "earcons": state.config.earcons.enabled,
+                            "earcon_volume": state.config.earcons.volume})
             elif route == "/api/pending":
                 self._json(state.pending)
             else:
@@ -556,6 +566,19 @@ def _make_handler(state: WizardState):
                     self._preview(body)
                 elif route == "/api/hermes/test":
                     self._hermes_test(body)
+                elif route == "/api/behavior/config":
+                    for key, section, field, cast in (
+                        ("stream", "hermes", "stream", bool),
+                        ("follow_up", "conversation", "follow_up", bool),
+                        ("follow_up_seconds",
+                         "conversation", "follow_up_seconds", float),
+                        ("max_turns", "conversation", "max_turns", int),
+                        ("earcons", "earcons", "enabled", bool),
+                        ("earcon_volume", "earcons", "volume", float),
+                    ):
+                        if key in body:
+                            state.set_pending(section, field, cast(body[key]))
+                    self._json({"ok": True})
                 elif route == "/api/mqtt/config":
                     state.set_pending("mqtt", "enabled", bool(body["enabled"]))
                     self._json({"ok": True,
