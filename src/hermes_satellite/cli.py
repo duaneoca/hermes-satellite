@@ -58,6 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="Good evening. All systems are operating within normal parameters.",
         help="phrase to speak in preview",
     )
+
+    setup = sub.add_parser(
+        "setup",
+        help="start the temporary token-protected setup wizard (web UI); "
+             "exits on idle or via the Exit button — no resident ports",
+    )
+    setup.add_argument("--port", type=int, default=8321)
+    setup.add_argument(
+        "--idle-timeout-min", type=float, default=15.0,
+        help="auto-exit after this many idle minutes",
+    )
     return parser
 
 
@@ -204,6 +215,14 @@ def main(argv=None) -> int:
 
     if getattr(args, "command", None) == "voices":
         return _run_voices(config, args)
+
+    if getattr(args, "command", None) == "setup":
+        from .wizard import run_wizard
+
+        return run_wizard(
+            config, args.config,
+            port=args.port, idle_timeout_s=args.idle_timeout_min * 60,
+        )
 
     if args.ww_monitor:
         return _run_ww_monitor(config)

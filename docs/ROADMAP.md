@@ -38,7 +38,7 @@ listening ports, preserving the IoT-VLAN posture; see docs/networking.md):
   topic → online/offline
 - `event`/trigger: wake word detected — enables "pause media when addressed"
 
-**2. Setup → on-demand web wizard, not a web service.**
+**2. Setup → on-demand web wizard, not a web service.** — ✅ shipped 2026-07-07
 `hermes-satellite setup --web` starts a temporary token-protected server,
 walks device selection → mixer calibration with a live level meter → voice
 audition → wake threshold tuning with live scores → Hermes connection test,

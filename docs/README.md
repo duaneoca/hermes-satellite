@@ -6,6 +6,7 @@
 | [hermes-api.md](hermes-api.md) | The Hermes API contract this client speaks: endpoint, auth, session-key memory scoping |
 | [networking.md](networking.md) | Traffic profile, IoT VLAN / firewall rules, Wi-Fi (WPA3) caveats, offline installs |
 | [home-assistant.md](home-assistant.md) | HA integration via outbound-only MQTT discovery: knobs, state, wake events |
+| [setup-wizard.md](setup-wizard.md) | On-demand web wizard: doctor, audio calibration, wake tuning, voice audition — exits when done |
 | [wakeword.md](wakeword.md) | Wake word (openWakeWord, default): models, tuning ladder, `--ww-monitor`, custom "Hey Hermes", personal verifier |
 | [porcupine.md](porcupine.md) | Porcupine backend (non-default; needs a paid Picovoice key) |
 | [moonshine.md](moonshine.md) | On-device STT: install, model choice, backend integration |

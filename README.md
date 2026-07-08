@@ -69,6 +69,7 @@ See the per‑board setup guides under [`docs/hardware/`](docs/hardware/).
 - [Hermes API integration](docs/hermes-api.md)
 - [Networking / IoT VLAN deployment](docs/networking.md)
 - [Home Assistant integration (MQTT)](docs/home-assistant.md)
+- [Setup wizard (on-demand web UI)](docs/setup-wizard.md)
 - [Wake word (openWakeWord)](docs/wakeword.md)
 - [Porcupine backend (optional)](docs/porcupine.md)
 - [Moonshine (STT)](docs/moonshine.md)
