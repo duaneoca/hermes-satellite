@@ -6,16 +6,22 @@ misleading level metrics), not the config file itself.
 
 ## V1.x — onboarding
 
-- **`hermes-satellite setup` wizard**: automate the entire audio bring-up —
+- ✅ **`hermes-satellite setup` wizard** (shipped 2026-07-07/08 as the
+  on-demand web wizard; field-hardened across two fresh installs):
+  automate the entire audio bring-up —
   detect the HAT/overlay, apply the wm8960 mixer recipe, interactive gain
   calibration with a live level meter (target p99 30-70%), speaker test tone,
   `alsactl store`, write `config.yaml`, optionally install the systemd unit.
   Everything docs/hardware/pi4-respeaker-v1.md does by hand, guided.
-- **`hermes-satellite doctor`**: one-shot health check — card present, mixer
+- **`hermes-satellite doctor`** (partially shipped: the wizard's Status
+  section covers card/board/onnxruntime/models/Hermes checks; a
+  standalone CLI one-shot remains): one-shot health check — card present, mixer
   routing sane, capture level in range, SPI node, group membership, Hermes
   reachability, onnxruntime version (< 1.27), model files present.
 - Earcons (wake chime / error tone) — audio feedback so users aren't
-  dependent on seeing the LEDs.
+  dependent on seeing the LEDs. **Next up.**
+- Wizard transcription-test section (exam finding: STT is the one stage
+  the wizard never exercises; would also pre-warm the Moonshine cache).
 
 ## V2 — configuration & integration (architecture agreed 2026-07-07)
 
