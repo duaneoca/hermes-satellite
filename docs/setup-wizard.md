@@ -45,7 +45,10 @@ open**.
 5. **Voice** — full catalog + downloaded voices, on-device preview with
    speaker/pace knobs (downloads on demand).
 6. **Hermes** — health + authenticated round-trip chat test.
-7. **Review & save** — collected changes are listed; **Save
+7. **Home Assistant (MQTT)** — enable toggle, broker settings with a
+   masked password (kept in `secrets.env`), and a live broker connection
+   test that distinguishes unreachable / auth-refused / connected.
+8. **Review & save** — collected changes are listed; **Save
    configuration** first copies your current config to a timestamped
    backup (`config.yaml.bak-YYYYMMDD-HHMMSS`) and then updates
    `config.yaml` in place. **Credentials are stripped from the yaml and

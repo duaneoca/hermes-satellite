@@ -107,7 +107,25 @@ behind your back.</p>
   <p id="hres"></p>
 </section>
 
-<h2>7 · Review &amp; save</h2>
+<h2>7 · Home Assistant (MQTT)</h2>
+<section>
+  <p class="muted">Optional: the satellite appears in Home Assistant with a
+  mute switch, volume/threshold sliders, voice select and a wake-word event —
+  outbound-only, no ports opened. Needs an MQTT broker HA can see (usually
+  the Mosquitto add-on).</p>
+  <label><input id="me" type="checkbox"
+    onchange="post('/api/mqtt/config',{enabled:this.checked}).then(loadPending)">
+    Enable</label>
+  <label>Broker <input id="mh" size="14"></label>
+  <label>Port <input id="mp" size="5"></label>
+  <label>User <input id="mu" size="10"></label>
+  <label>Password <input id="mw" size="16" type="password"></label>
+  <button onclick="mqttTest()">Test broker connection</button>
+  <span id="mres"></span>
+  <p class="muted">Device will appear in HA as <b id="mid"></b>.</p>
+</section>
+
+<h2>8 · Review &amp; save</h2>
 <section>
   <pre id="pending">(no changes yet)</pre>
   <button onclick="save()">Save configuration</button>
@@ -301,6 +319,29 @@ function loadHermes() {
       : "no key configured";
   });
 }
+function loadMqtt() {
+  get("/api/mqtt").then(m => {
+    document.getElementById("me").checked = m.enabled;
+    document.getElementById("mh").value = m.host || "";
+    document.getElementById("mp").value = m.port || 1883;
+    document.getElementById("mu").value = m.username || "";
+    document.getElementById("mid").textContent = m.device_id || "(hostname)";
+    document.getElementById("mw").placeholder = m.password_hint
+      ? `configured ${m.password_hint} — leave blank to keep` : "(none)";
+  });
+}
+function mqttTest() {
+  document.getElementById("mres").textContent = "testing…";
+  post("/api/mqtt/test", {host: document.getElementById("mh").value,
+    port: document.getElementById("mp").value,
+    username: document.getElementById("mu").value,
+    password: document.getElementById("mw").value})
+  .then(r => {
+    document.getElementById("mres").textContent = r.result;
+    document.getElementById("mres").className = r.ok ? "ok" : "bad";
+    loadPending();
+  });
+}
 function hermesTest() {
   document.getElementById("hres").textContent = "testing…";
   post("/api/hermes/test", {host: document.getElementById("hh").value,
@@ -331,7 +372,7 @@ function save() {
         "restart the daemon to apply.";
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadMqtt();
 </script>
 </body>
 </html>

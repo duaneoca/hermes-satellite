@@ -347,3 +347,66 @@ def test_pa_alsa_plughw_defaulted():
     import os
     import hermes_satellite  # noqa: F401  (import side effect)
     assert os.environ.get("PA_ALSA_PLUGHW") == "1"
+
+
+def test_mqtt_prefill_masks_password(wizard):
+    state, base = wizard
+    state.config.mqtt.host = "broker.local"
+    state.config.mqtt.username = "sat"
+    state.config.mqtt.password = "broker-password-1234"
+    code, body = _get(f"{base}/api/mqtt?token={state.token}")
+    assert body["host"] == "broker.local"
+    assert body["password_hint"] == "••••1234"
+    assert "broker-password" not in json.dumps(body)
+
+
+def test_mqtt_enable_toggle_pends(wizard):
+    state, base = wizard
+    _post(f"{base}/api/mqtt/config?token={state.token}", {"enabled": True})
+    assert state.config.mqtt.enabled is True
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["mqtt.enabled"] is True
+
+
+def test_mqtt_test_success_pends_settings(wizard, monkeypatch):
+    import sys
+    import types as t
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            self.on_connect = None
+
+        def username_pw_set(self, u, p):
+            pass
+
+        def connect_async(self, host, port):
+            self._hp = (host, port)
+
+        def loop_start(self):
+            self.on_connect(self, None, None, 0)
+
+        def loop_stop(self):
+            pass
+
+        def disconnect(self):
+            pass
+
+    pkg = t.ModuleType("paho"); m = t.ModuleType("paho.mqtt")
+    c = t.ModuleType("paho.mqtt.client"); c.Client = FakeClient
+    pkg.mqtt = m; m.client = c
+    monkeypatch.setitem(sys.modules, "paho", pkg)
+    monkeypatch.setitem(sys.modules, "paho.mqtt", m)
+    monkeypatch.setitem(sys.modules, "paho.mqtt.client", c)
+
+    state, base = wizard
+    code, body = _post(f"{base}/api/mqtt/test?token={state.token}",
+                       {"host": "b.local", "port": 1883,
+                        "username": "sat", "password": "pw"})
+    assert body["ok"] is True
+    assert state.config.mqtt.host == "b.local"
+    assert state.config.mqtt.password == "pw"
+    # and save() must strip that password into secrets.env
+    _, result = _post(f"{base}/api/save?token={state.token}")
+    import yaml
+    assert yaml.safe_load(open(state.config_path))["mqtt"]["password"] == ""
+    assert "MQTT_PASSWORD=pw" in open(result["secrets"]).read()

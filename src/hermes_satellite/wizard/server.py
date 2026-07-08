@@ -475,6 +475,15 @@ def _make_handler(state: WizardState):
                 card = query.get("card", [""])[0]
                 self._json({"controls": mixer.get_controls(card)} if card
                            else {"error": "card required"})
+            elif route == "/api/mqtt":
+                mqtt_cfg = state.config.mqtt
+                pw = mqtt_cfg.password
+                hint = ("••••" + pw[-4:]) if len(pw) > 8 else ("••••" if pw else "")
+                self._json({"enabled": mqtt_cfg.enabled,
+                            "host": mqtt_cfg.host, "port": mqtt_cfg.port,
+                            "username": mqtt_cfg.username,
+                            "device_id": mqtt_cfg.device_id,
+                            "password_hint": hint})
             elif route == "/api/hermes":
                 hermes = state.config.hermes
                 key = hermes.api_key
@@ -536,6 +545,12 @@ def _make_handler(state: WizardState):
                     self._preview(body)
                 elif route == "/api/hermes/test":
                     self._hermes_test(body)
+                elif route == "/api/mqtt/config":
+                    state.set_pending("mqtt", "enabled", bool(body["enabled"]))
+                    self._json({"ok": True,
+                                "enabled": state.config.mqtt.enabled})
+                elif route == "/api/mqtt/test":
+                    self._mqtt_test(body)
                 elif route == "/api/save":
                     self._json(state.save())
                 elif route == "/api/exit":
@@ -636,6 +651,58 @@ def _make_handler(state: WizardState):
             self._json({"ok": True, "sample_rate": tts.sample_rate,
                         "downloaded": not was_downloaded,
                         "elapsed": elapsed})
+
+        def _mqtt_test(self, body):
+            import paho.mqtt.client as paho
+
+            host = body.get("host") or state.config.mqtt.host
+            port = int(body.get("port") or state.config.mqtt.port)
+            username = body.get("username", state.config.mqtt.username)
+            password = body.get("password") or state.config.mqtt.password
+            if not host:
+                return self._json({"result": "no broker host given"})
+
+            outcome = {}
+            connected = threading.Event()
+
+            def on_connect(client, userdata, flags, rc, properties=None):
+                code = getattr(rc, "value", rc)
+                outcome["ok"] = code == 0 or str(rc) == "Success"
+                outcome["rc"] = str(rc)
+                connected.set()
+
+            try:
+                try:  # paho >= 2.0
+                    client = paho.Client(paho.CallbackAPIVersion.VERSION2,
+                                         client_id="hermes-satellite-wizard")
+                except AttributeError:  # paho 1.x
+                    client = paho.Client(client_id="hermes-satellite-wizard")
+                if username:
+                    client.username_pw_set(username, password or None)
+                client.on_connect = on_connect
+                client.connect_async(host, port)
+                client.loop_start()
+                connected.wait(6)
+                client.loop_stop()
+                client.disconnect()
+            except Exception as exc:
+                return self._json(
+                    {"result": f"unreachable ({type(exc).__name__}: {exc})"})
+            if not connected.is_set():
+                return self._json(
+                    {"result": f"no answer from {host}:{port} within 6s — "
+                               "host/port/firewall?"})
+            if not outcome.get("ok"):
+                return self._json(
+                    {"result": f"broker refused: {outcome.get('rc')} — "
+                               "check username/password"})
+            # success: pend the settings (password goes to secrets.env on save)
+            state.set_pending("mqtt", "host", host)
+            state.set_pending("mqtt", "port", port)
+            state.set_pending("mqtt", "username", username)
+            if body.get("password"):
+                state.set_pending("mqtt", "password", body["password"])
+            self._json({"result": "connected ✓", "ok": True})
 
         def _hermes_test(self, body):
             import requests

@@ -30,7 +30,9 @@ untouched.
 
 1. You need an MQTT broker HA can see (most setups: the Mosquitto add-on on
    the HA host) and HA's MQTT integration configured.
-2. Satellite config:
+2. Satellite config — easiest via the setup wizard's **Home Assistant
+   (MQTT)** section (prefills, masked password, live broker test), or by
+   hand:
 
    ```yaml
    mqtt:
