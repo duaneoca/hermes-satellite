@@ -150,7 +150,10 @@ defaults.ctl.card seeed2micvoicec
 
 If you do need to pin devices explicitly (e.g. HDMI keeps grabbing playback),
 the values are **sounddevice (PortAudio) integer indices — NOT the card
-numbers from `arecord -l`**. List them from inside the project venv:
+numbers from `arecord -l`**. (The daemon sets `PA_ALSA_PLUGHW=1` so pinned
+devices open through ALSA's converting plug layer — codecs that don't do a
+voice's native rate, e.g. 22050 Hz on the WM8960, get resampled instead of
+erroring. `PA_ALSA_PLUGHW=0` opts out.) List them from inside the project venv:
 
 ```bash
 python -c "import sounddevice as sd; print(sd.query_devices())"

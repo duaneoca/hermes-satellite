@@ -268,10 +268,35 @@ class WizardState:
         self.pending[f"{section}.{field}"] = value
 
     # -- doctor -----------------------------------------------------------------
+    @staticmethod
+    def _board_model(path: str = "/proc/device-tree/model") -> str:
+        try:
+            return Path(path).read_text().rstrip("\x00").strip()
+        except OSError:
+            return ""
+
     def status(self) -> dict:
         cfg = self.config
         checks = {}
         checks["profile"] = cfg.hardware_profile
+        board = self._board_model()
+        if board:
+            checks["board"] = board
+            expected = None
+            if "Raspberry Pi 4" in board:
+                expected = "pi4"
+            elif "Raspberry Pi 5" in board:
+                expected = "pi5"
+            if expected and not cfg.hardware_profile.startswith(expected):
+                checks["profile_warning"] = (
+                    f"this board is a {board!r} but hardware_profile is "
+                    f"{cfg.hardware_profile!r} — set hardware_profile: "
+                    f"{expected}-respeaker-v1"
+                    if expected == "pi4" else
+                    f"this board is a {board!r} but hardware_profile is "
+                    f"{cfg.hardware_profile!r} — set hardware_profile: "
+                    f"{expected}-respeaker-v2"
+                )
         spidev = Path(f"/dev/spidev{cfg.leds.spi_bus}.{cfg.leds.spi_device}")
         checks["spidev"] = spidev.exists() or f"missing {spidev}"
         try:
