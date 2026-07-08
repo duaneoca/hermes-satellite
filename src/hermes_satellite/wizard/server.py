@@ -243,6 +243,15 @@ class WizardState:
             checks["onnxruntime"] = ver if ver < "1.27" else f"{ver} — BROKEN, pin <1.27"
         except ImportError:
             checks["onnxruntime"] = "not installed"
+        cards = [c["id"] for c in mixer.list_cards()]
+        checks["alsa_cards"] = cards or "none found"
+        if cfg.hardware_profile.startswith("pi") and not any(
+            "seeed" in c.lower() or "wm8960" in c.lower() for c in cards
+        ):
+            checks["alsa_cards_warning"] = (
+                "no ReSpeaker/seeed card — audio overlay not installed or not "
+                "rebooted? See your hardware guide, section 1"
+            )
         voices = sorted(p.stem for p in Path(cfg.tts.voices_dir).glob("*.onnx")) \
             if Path(cfg.tts.voices_dir).exists() else []
         checks["voices_downloaded"] = voices or "none"

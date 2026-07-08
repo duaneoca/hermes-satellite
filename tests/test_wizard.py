@@ -235,3 +235,19 @@ def test_preview_caches_loaded_voice(wizard, monkeypatch, tmp_path):
     assert len(loads) == 1
     # the knob landed on the cached config
     assert state._tts_cache["en_GB-test-low"][0].speaker_id == 2
+
+
+def test_status_warns_when_seeed_card_missing(wizard, monkeypatch):
+    from hermes_satellite.wizard import mixer as mixer_mod
+    monkeypatch.setattr(mixer_mod, "list_cards",
+                        lambda *a, **k: [{"index": 0, "id": "Headphones"}])
+    state, base = wizard
+    state.config.hardware_profile = "pi4-respeaker-v1"
+    _, status = _get(f"{base}/api/status?token={state.token}")
+    assert status["alsa_cards"] == ["Headphones"]
+    assert "overlay" in status["alsa_cards_warning"]
+    # with the seeed card present, no warning
+    monkeypatch.setattr(mixer_mod, "list_cards",
+                        lambda *a, **k: [{"index": 3, "id": "seeed2micvoicec"}])
+    _, status = _get(f"{base}/api/status?token={state.token}")
+    assert "alsa_cards_warning" not in status
