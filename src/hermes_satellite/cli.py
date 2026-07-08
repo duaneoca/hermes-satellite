@@ -40,9 +40,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub = parser.add_subparsers(dest="command")
+
+    def _accept_global_flags(subparser):
+        # Let global options appear AFTER the subcommand too
+        # (`hermes-satellite setup --config x` — the way humans type it).
+        # SUPPRESS keeps a before-the-subcommand value from being clobbered
+        # by a subparser default.
+        subparser.add_argument("--config", "-c", default=argparse.SUPPRESS,
+                               help="path to config.yaml")
+        subparser.add_argument("--hardware-profile", default=argparse.SUPPRESS,
+                               help="override config hardware_profile")
+
     voices = sub.add_parser(
         "voices", help="browse and audition piper TTS voices on this device"
     )
+    _accept_global_flags(voices)
     voices.add_argument("action", choices=["list", "preview"])
     voices.add_argument("name", nargs="?", help="voice name (for preview)")
     voices.add_argument(
@@ -64,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="start the temporary token-protected setup wizard (web UI); "
              "exits on idle or via the Exit button — no resident ports",
     )
+    _accept_global_flags(setup)
     setup.add_argument("--port", type=int, default=8321)
     setup.add_argument(
         "--idle-timeout-min", type=float, default=15.0,
