@@ -47,6 +47,43 @@ logger = logging.getLogger(__name__)
 _heavy_lock = threading.Lock()
 
 
+def _ensure_voices_dir(config) -> None:
+    """Make sure the voice download target exists and is writable.
+
+    Fresh-install gap: /var/lib/hermes-satellite is created by the service
+    install (step 4), but the wizard (step 3) downloads voices into it. Try
+    plain creation, then non-interactive sudo (fixed argument lists, no
+    shell), then hand the user the exact commands.
+    """
+    import getpass
+    import os
+    import subprocess
+
+    path = Path(config.tts.voices_dir)
+    if path.is_dir() and os.access(path, os.W_OK):
+        return
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return
+    except (PermissionError, FileNotFoundError):
+        pass
+    user = getpass.getuser()
+    data_dir = str(config.data_dir)
+    for command in (["sudo", "-n", "mkdir", "-p", str(path)],
+                    ["sudo", "-n", "chown", "-R", user, data_dir]):
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=10)
+        except OSError:
+            result = None
+        if result is None or result.returncode != 0:
+            raise RuntimeError(
+                f"cannot create {path} — run on the device: "
+                f"sudo mkdir -p {path} && sudo chown -R {user} {data_dir}"
+            )
+    logger.info("created %s (owned by %s) via sudo", path, user)
+
+
 def _preload_heavy_modules() -> None:
     """Import shared C-extension modules once, in the main thread, BEFORE
     the browser can hit us with parallel requests. Field failure without
@@ -498,6 +535,7 @@ def _make_handler(state: WizardState):
 
             state.meter.stop()
             state.wake.stop()
+            _ensure_voices_dir(state.config)
             name = body.get("name") or state.config.tts.voice
             speaker = body.get("speaker_id")
             length_scale = body.get("length_scale")

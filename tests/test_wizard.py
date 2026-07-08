@@ -251,3 +251,49 @@ def test_status_warns_when_seeed_card_missing(wizard, monkeypatch):
                         lambda *a, **k: [{"index": 3, "id": "seeed2micvoicec"}])
     _, status = _get(f"{base}/api/status?token={state.token}")
     assert "alsa_cards_warning" not in status
+
+
+def test_ensure_voices_dir(tmp_path, monkeypatch):
+    import subprocess
+    import types
+    from hermes_satellite.wizard.server import _ensure_voices_dir
+
+    cfg = types.SimpleNamespace(
+        tts=types.SimpleNamespace(voices_dir=str(tmp_path / "data" / "voices")),
+        data_dir=str(tmp_path / "data"),
+    )
+    # creatable: plain mkdir, no sudo involved
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *a, **k: calls.append(a) or None)
+    _ensure_voices_dir(cfg)
+    assert (tmp_path / "data" / "voices").is_dir()
+    assert calls == []
+
+    # uncreatable: escalate via sudo -n with the right fixed commands
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    cfg2 = types.SimpleNamespace(
+        tts=types.SimpleNamespace(voices_dir=str(locked / "x" / "voices")),
+        data_dir=str(locked / "x"),
+    )
+    sudo_calls = []
+
+    def fake_run(args, capture_output=True, text=True, timeout=10):
+        sudo_calls.append(args)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    _ensure_voices_dir(cfg2)
+    assert sudo_calls[0][:3] == ["sudo", "-n", "mkdir"]
+    assert sudo_calls[1][:3] == ["sudo", "-n", "chown"]
+
+    # sudo denied: clear hint with the exact commands
+    def fail_run(args, capture_output=True, text=True, timeout=10):
+        return types.SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr(subprocess, "run", fail_run)
+    with pytest.raises(RuntimeError, match="sudo mkdir -p"):
+        _ensure_voices_dir(cfg2)
+    locked.chmod(0o755)
