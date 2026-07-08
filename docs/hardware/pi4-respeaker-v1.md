@@ -214,9 +214,15 @@ with them.)
 >
 >   ```bash
 >   curl -LsSf https://astral.sh/uv/install.sh | sh   # installs to ~/.local/bin
+>   export PATH="$HOME/.local/bin:$PATH"              # this shell session
+>   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc   # future sessions
 >   uv python install 3.11
 >   uv venv --seed --python 3.11 .venv     # --seed puts pip in the venv
 >   ```
+>
+>   (uv is admin tooling for *your* user only — the `hermes-sat` service
+>   user never needs it or any PATH setup; the systemd unit invokes the
+>   venv's python by absolute path.)
 >
 >   then continue with `source .venv/bin/activate` and the pip steps below.
 

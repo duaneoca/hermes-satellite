@@ -175,6 +175,9 @@ stays your user's and is unrelated to the deployed copy.
    > would be unable to read its own interpreter and fail at startup.
    > `UV_PYTHON_INSTALL_DIR` puts the interpreter inside `/opt` instead.
 
+   Note: `hermes-sat` needs **no** shell environment, PATH, or uv setup —
+   uv is bootstrap tooling for the admin; the unit runs the venv's python by
+   absolute path.
    ```bash
    sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes-sat
    sudo git clone https://github.com/duaneoca/hermes-satellite /opt/hermes-satellite
