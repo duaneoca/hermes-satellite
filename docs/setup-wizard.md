@@ -31,8 +31,12 @@ open**.
    (flags the broken 1.27.x), downloaded voices, Hermes `/health`.
 2. **Audio devices** — pick input/output/channels from live device list;
    test tone button.
-3. **Microphone level** — live meter (RMS + rolling p99) while you
-   calibrate gain; target p99 30–70 %.
+3. **Microphone level** — live meter (RMS + rolling p99; target p99
+   30–70 %) **with mixer sliders right beside it**: pick the ALSA card,
+   drag Capture/ADC PCM/Speaker while watching the meter, one-click
+   "Apply WM8960 recipe" (the full routing fix from the Pi 4 guide),
+   and Persist (`alsactl store`; falls back to printing the sudo
+   command if it needs root). Only whitelisted controls are settable.
 4. **Wake word** — live score monitor + detection counter; set the
    threshold from evidence.
 5. **Voice** — full catalog + downloaded voices, on-device preview with

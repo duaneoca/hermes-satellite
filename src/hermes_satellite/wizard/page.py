@@ -56,6 +56,12 @@ behind your back.</p>
   <button onclick="meterStop()">Stop</button>
   <div class="meter" id="rmsbar"><div></div></div>
   <p>live <span id="rms">–</span>% &nbsp; p99(3s) <b id="p99">–</b>%</p>
+  <h3 style="font-size:.95rem">Mixer (ALSA)</h3>
+  <label>Card <select id="card" onchange="loadMixer()"></select></label>
+  <button onclick="applyRecipe()">Apply WM8960 recipe</button>
+  <button onclick="mixerStore()">Persist (alsactl store)</button>
+  <span id="mixmsg" class="muted"></span>
+  <div id="sliders"></div>
 </section>
 
 <h2>4 · Wake word</h2>
@@ -151,6 +157,56 @@ function meterStart() {
   }), 250);
 }
 function meterStop() { post("/api/meter/stop"); clearInterval(meterTimer); }
+function loadCards() {
+  get("/api/mixer/cards").then(c => {
+    const sel = document.getElementById("card");
+    sel.innerHTML = c.cards.map(x =>
+      `<option value="${x.index}" ${x.id.includes("seeed")?"selected":""}>` +
+      `${x.index}: ${x.id}</option>`).join("") ||
+      "<option value=''>(no ALSA cards)</option>";
+    if (c.cards.length) loadMixer();
+  });
+}
+function loadMixer() {
+  const card = document.getElementById("card").value;
+  if (card === "") return;
+  get("/api/mixer?card=" + card).then(m => {
+    const rows = [];
+    for (const [name, c] of Object.entries(m.controls || {})) {
+      rows.push(`<label style="display:block">` +
+        `<span style="display:inline-block;width:8rem">${name}` +
+        `${c.switch ? " ["+c.switch+"]" : ""}</span>` +
+        `<input type="range" min="0" max="${c.max}" value="${c.value}" ` +
+        `style="width:260px;vertical-align:middle" ` +
+        `onchange="setMixer('${name}', this.value)">` +
+        ` <span>${c.value}/${c.max}</span></label>`);
+    }
+    document.getElementById("sliders").innerHTML = rows.join("") ||
+      "<p class='muted'>no adjustable controls found on this card</p>";
+  });
+}
+function setMixer(control, value) {
+  const card = document.getElementById("card").value;
+  post("/api/mixer/set", {card: card, control: control, value: value})
+    .then(r => { document.getElementById("mixmsg").textContent =
+      r.error ? ("failed: " + r.error) : ""; loadMixer(); });
+}
+function applyRecipe() {
+  const card = document.getElementById("card").value;
+  document.getElementById("mixmsg").textContent = "applying…";
+  post("/api/mixer/recipe", {card: card}).then(r => {
+    document.getElementById("mixmsg").textContent =
+      `applied ${r.applied.length} controls` +
+      (r.failed.length ? `; failed: ${r.failed.join(", ")}` : "");
+    loadMixer();
+  });
+}
+function mixerStore() {
+  post("/api/mixer/store").then(r => {
+    document.getElementById("mixmsg").textContent =
+      r.ok ? "persisted ✓" : (r.hint || r.error || "failed");
+  });
+}
 function wakeStart() {
   post("/api/wake/start");
   clearInterval(wakeTimer);
@@ -216,7 +272,7 @@ function save() {
     el.textContent = `written: ${r.written}\\n\\n${r.note}\\n  ${r.command}`;
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards();
 </script>
 </body>
 </html>

@@ -34,9 +34,30 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from . import mixer
 from .page import PAGE_HTML
 
 logger = logging.getLogger(__name__)
+
+# Serializes lazy construction of numpy-heavy components (wake detector,
+# piper voice). First imports of C-extension modules from concurrent request
+# threads can poison numpy for the whole process ("cannot load module more
+# than once per process") — see _preload_heavy_modules, which is the primary
+# defense; this lock covers whatever loads later.
+_heavy_lock = threading.Lock()
+
+
+def _preload_heavy_modules() -> None:
+    """Import shared C-extension modules once, in the main thread, BEFORE
+    the browser can hit us with parallel requests. Field failure without
+    this: the page's simultaneous /api/status + /api/audio/devices +
+    /api/voices calls raced numpy's import machinery
+    (_ModuleLock deadlock -> numpy poisoned for the process)."""
+    for module in ("numpy", "sounddevice", "onnxruntime", "requests", "piper"):
+        try:
+            __import__(module)
+        except Exception as exc:  # missing on this platform: fine
+            logger.debug("preload %s skipped: %s", module, exc)
 
 
 class _Meter:
@@ -125,7 +146,8 @@ class _WakeMonitor:
             mic = MicStream(sample_rate=audio.sample_rate,
                             device=audio.input_device,
                             channels=audio.input_channels)
-            detector = build_wakeword(self._config, demo=False, mic=mic)
+            with _heavy_lock:
+                detector = build_wakeword(self._config, demo=False, mic=mic)
             self._detector = detector
 
             def on_score(predictions):
@@ -276,6 +298,13 @@ def _make_handler(state: WizardState):
                             "error": state.wake.error})
             elif route == "/api/voices":
                 self._voices()
+            elif route == "/api/mixer/cards":
+                self._json({"cards": mixer.list_cards()})
+            elif route == "/api/mixer":
+                query = parse_qs(urlparse(self.path).query)
+                card = query.get("card", [""])[0]
+                self._json({"controls": mixer.get_controls(card)} if card
+                           else {"error": "card required"})
             elif route == "/api/pending":
                 self._json(state.pending)
             else:
@@ -318,6 +347,13 @@ def _make_handler(state: WizardState):
                     )
                     self._json({"ok": True,
                                 "threshold": state.config.wakeword.threshold})
+                elif route == "/api/mixer/set":
+                    self._json(mixer.set_control(
+                        body["card"], body["control"], body["value"]))
+                elif route == "/api/mixer/recipe":
+                    self._json(mixer.apply_recipe(body["card"]))
+                elif route == "/api/mixer/store":
+                    self._json(mixer.store())
                 elif route == "/api/voices/preview":
                     self._preview(body)
                 elif route == "/api/hermes/test":
@@ -388,7 +424,8 @@ def _make_handler(state: WizardState):
                 if length_scale not in (None, "") else None,
             )
             tts = PiperTTS(tts_cfg, sample_rate=state.config.audio.sample_rate)
-            pcm = tts.synthesize(
+            with _heavy_lock:
+                pcm = tts.synthesize(
                 body.get("text")
                 or "Good evening. All systems are operating within normal parameters."
             )
@@ -441,6 +478,7 @@ def _make_handler(state: WizardState):
 
 def run_wizard(config, config_path: str, host: str = "0.0.0.0",
                port: int = 8321, idle_timeout_s: float = 900.0) -> int:
+    _preload_heavy_modules()
     state = WizardState(config, config_path, idle_timeout_s)
     server = ThreadingHTTPServer((host, port), _make_handler(state))
 
