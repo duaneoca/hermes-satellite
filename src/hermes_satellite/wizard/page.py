@@ -70,8 +70,11 @@ behind your back.</p>
 
 <h2>4 · Wake word</h2>
 <section>
-  <p class="muted">Start, then say the wake phrase a few times. Threshold
-  should sit comfortably below your spoken scores and above ambient.</p>
+  <p class="muted">Start, then <b>watch the device</b>: when the HAT LEDs
+  begin breathing blue — the same indication the running daemon shows while
+  waiting for its wake word — it's listening. Say the wake phrase a few
+  times. Threshold should sit comfortably below your spoken scores and above
+  ambient.</p>
   <button onclick="wakeStart()">Start listening test</button>
   <button onclick="wakeStop()">Stop</button>
   <b id="wstat" class="muted"></b>
@@ -226,8 +229,8 @@ function wakeStart() {
   clearInterval(wakeTimer);
   wakeTimer = setInterval(() => get("/api/wake").then(w => {
     document.getElementById("wstat").textContent = w.error ? "" :
-      (w.ready ? "● listening — say the wake phrase (LEDs are lit)"
-               : "starting (loading model)…");
+      (w.ready ? "● listening — LEDs are breathing blue; say the wake phrase"
+               : "starting (loading model, a few seconds)…");
     document.getElementById("wl").textContent = w.last.toFixed(3);
     document.getElementById("wb").textContent = w.best.toFixed(3);
     document.getElementById("wd").textContent = w.detections;
@@ -257,14 +260,17 @@ function loadVoices() {
 }
 function preview() {
   const name = document.getElementById("voice").value.split(" ")[0];
-  document.getElementById("vres").textContent = "downloading/synthesizing…";
+  document.getElementById("vres").textContent =
+    "working… (first use of a voice downloads ~60 MB)";
   post("/api/voices/preview", {name: name,
     speaker_id: document.getElementById("spk").value,
     length_scale: document.getElementById("pace").value,
     text: document.getElementById("phrase").value})
   .then(r => {
-    document.getElementById("vres").textContent =
-      r.error ? ("failed: " + r.error) : ("played @ " + r.sample_rate + " Hz");
+    document.getElementById("vres").textContent = r.error
+      ? ("failed: " + r.error)
+      : `spoke in ${r.elapsed}s @ ${r.sample_rate} Hz` +
+        (r.downloaded ? " (downloaded this voice for the first time)" : "");
     loadPending();
   });
 }

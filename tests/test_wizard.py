@@ -194,3 +194,44 @@ def test_wake_monitor_ready_flag_and_callbacks(wizard, monkeypatch):
     monitor._thread.join(timeout=5)
     assert events == [("listening", True), ("stopped", False)]
     assert monitor.last == 0.42
+
+
+def test_preview_caches_loaded_voice(wizard, monkeypatch, tmp_path):
+    """Second preview of the same voice must not reload the model."""
+    import sys
+    import types as t
+    loads = []
+
+    class FakeVoice:
+        config = t.SimpleNamespace(sample_rate=16000)
+
+        @classmethod
+        def load(cls, path):
+            loads.append(path)
+            return cls()
+
+        def synthesize_stream_raw(self, text, **kw):
+            yield b"\x00\x00"
+
+    piper_pkg = t.ModuleType("piper")
+    voice_mod = t.ModuleType("piper.voice")
+    voice_mod.PiperVoice = FakeVoice
+    piper_pkg.voice = voice_mod
+    piper_pkg.PiperVoice = FakeVoice
+    monkeypatch.setitem(sys.modules, "piper", piper_pkg)
+    monkeypatch.setitem(sys.modules, "piper.voice", voice_mod)
+
+    state, base = wizard
+    voices = tmp_path / "voices"
+    voices.mkdir()
+    (voices / "en_GB-test-low.onnx").write_bytes(b"x")
+    state.config.tts.voices_dir = str(voices)
+
+    for speaker in ("", "2"):  # knob change must not force a reload
+        code, r = _post(f"{base}/api/voices/preview?token={state.token}",
+                        {"name": "en_GB-test-low", "speaker_id": speaker})
+        assert r.get("ok"), r
+        assert r["downloaded"] is False
+    assert len(loads) == 1
+    # the knob landed on the cached config
+    assert state._tts_cache["en_GB-test-low"][0].speaker_id == 2

@@ -197,8 +197,11 @@ class WizardState:
         self._leds = None
         # Show "listening" on the real HAT LEDs while the wake test runs —
         # the daemon is stopped during setup, so the LEDs are ours to use.
-        self.wake.on_listening = lambda: self._led("recording")
+        # IDLE (breathing blue) is deliberately the same indication the
+        # daemon shows while waiting for the wake word.
+        self.wake.on_listening = lambda: self._led("idle")
         self.wake.on_stopped = lambda: self._led("off")
+        self._tts_cache: dict = {}
 
     def _led(self, name: str) -> None:
         try:
@@ -209,7 +212,7 @@ class WizardState:
                 self._leds = build_led_controller(self.config)
                 self._leds.start()
             self._leds.set_state(
-                LEDState.RECORDING if name == "recording" else LEDState.OFF
+                LEDState.IDLE if name == "idle" else LEDState.OFF
             )
         except Exception as exc:  # cosmetic: never break the wizard over LEDs
             logger.debug("wizard LEDs unavailable: %s", exc)
