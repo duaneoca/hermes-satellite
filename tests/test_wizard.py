@@ -93,6 +93,14 @@ def test_save_backs_up_then_overwrites_in_place(wizard, tmp_path):
     assert saved["audio"]["input_device"] == 1
     assert saved["hardware_profile"] == "mock"
     assert saved["wakeword"]["model_path"] == "hey_jarvis"
+    # every config section must survive a wizard save (regression: the
+    # earcons/conversation sections were once silently dropped)
+    from hermes_satellite.config import Config
+    import dataclasses
+    yaml_sections = {f.name for f in dataclasses.fields(Config)
+                     if f.name not in ("profile",)}
+    missing = yaml_sections - set(saved)
+    assert not missing, f"wizard save dropped config sections: {missing}"
     # previous content preserved in a timestamped backup
     assert ".bak-" in result["backup"]
     assert open(result["backup"]).read() == original

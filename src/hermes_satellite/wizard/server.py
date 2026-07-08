@@ -345,7 +345,8 @@ class WizardState:
             "log_level": cfg.log_level,
             "data_dir": cfg.data_dir,
         }
-        for section in ("wakeword", "hermes", "audio", "stt", "tts", "leds", "mqtt"):
+        for section in ("wakeword", "hermes", "audio", "stt", "tts", "leds",
+                        "earcons", "conversation", "mqtt"):
             obj = getattr(cfg, section)
             data[section] = {
                 k: v for k, v in obj.__dict__.items() if not k.startswith("_")
