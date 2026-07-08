@@ -11,6 +11,14 @@ sudo systemctl stop hermes-satellite      # or Ctrl-C an interactive run
 hermes-satellite setup --config /path/to/config.yaml
 ```
 
+On a deployed satellite, `scripts/configure-satellite.sh` wraps the whole
+ceremony (stop daemon if running → wizard against the live `/etc` config →
+restart only if it was running). Symlink it for convenience:
+
+```bash
+ln -s /opt/hermes-satellite/scripts/configure-satellite.sh ~/configure-satellite
+```
+
 It prints a URL like `http://jarvis-pi-4:8321/?token=Kx3v…` — open it from
 any browser on the LAN. When you're done (Exit button, Ctrl-C, or 15 idle
 minutes — `--idle-timeout-min`), the process exits and **no ports remain
