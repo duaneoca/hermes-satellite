@@ -36,7 +36,22 @@ def test_send_sets_headers_and_payload_and_parses_reply():
     body = json.loads(req.body)
     assert body["model"] == "hermes"
     assert body["stream"] is False
-    assert body["messages"] == [{"role": "user", "content": "hello"}]
+    # Default config carries the speakable-output system prompt.
+    assert body["messages"][0]["role"] == "system"
+    assert "spoken aloud" in body["messages"][0]["content"]
+    assert body["messages"][-1] == {"role": "user", "content": "hello"}
+
+
+@responses.activate
+def test_empty_system_prompt_sends_user_message_only():
+    responses.add(
+        responses.POST, URL,
+        json={"choices": [{"message": {"content": "ok"}}]}, status=200,
+    )
+    HermesClient(_config(system_prompt="")).send("hi", session_key="d")
+    import json
+    body = json.loads(responses.calls[0].request.body)
+    assert body["messages"] == [{"role": "user", "content": "hi"}]
 
 
 @responses.activate

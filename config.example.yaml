@@ -79,8 +79,18 @@ stt:
 
 tts:
   backend: piper           # piper | ...
-  # Piper voice .onnx model (its .onnx.json config must sit alongside it).
-  voice_path: /var/lib/hermes-satellite/voice.onnx
+  # Catalog voice name — auto-downloaded into voices_dir on first use.
+  # Browse/audition on-device:  hermes-satellite voices list --language en_GB
+  #                             hermes-satellite voices preview <name>
+  voice: en_GB-northern_english_male-medium
+  # Or an explicit path to a .onnx file (overrides `voice`; .onnx.json alongside):
+  # voice_path: /var/lib/hermes-satellite/custom.onnx
+  voices_dir: /var/lib/hermes-satellite/voices
+  # Multi-speaker voices (vctk: 109 speakers, aru: 12): pick one by id.
+  # speaker_id: 47
+  # Pacing: >1.0 slower/statelier, <1.0 brisker.
+  # length_scale: 1.05
+  # volume: 1.0
 
 leds:
   backend: apa102          # apa102 | mock

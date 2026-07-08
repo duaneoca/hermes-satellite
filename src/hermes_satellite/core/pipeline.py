@@ -21,6 +21,7 @@ from ..stt.base import STTEngine
 from ..tts.base import TTSEngine
 from ..wakeword.base import WakeWordDetector
 from .events import Event, StateMachine
+from .speech_text import make_speakable
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,13 @@ class Pipeline:
         logger.info("hermes reply: %s", reply)
         self.sm.dispatch(Event.RESPONSE_READY)
 
-        pcm = self.tts.synthesize(reply)
+        # Defense-in-depth against markdown reaching the speaker: the system
+        # prompt asks for plain prose; this flattens whatever slipped through.
+        speakable = make_speakable(reply)
+        if speakable != reply:
+            logger.debug("sanitized reply for speech: %s", speakable)
+
+        pcm = self.tts.synthesize(speakable)
         self.audio_sink.play(pcm, self.tts.sample_rate)
         self.sm.dispatch(Event.PLAYBACK_DONE)
 

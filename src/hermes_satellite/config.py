@@ -61,6 +61,15 @@ class WakeWordConfig:
     sensitivity: float = 0.5
 
 
+# Replies are spoken aloud; ask the agent for prose a TTS engine can read.
+DEFAULT_SYSTEM_PROMPT = (
+    "Your reply will be spoken aloud by a voice assistant. Respond in plain "
+    "conversational prose only: no markdown, asterisks, bullet points, "
+    "headers, tables, code blocks, or emojis. Be concise — one to three "
+    "sentences — unless the user asks for detail."
+)
+
+
 @dataclass
 class HermesConfig:
     host: str = "127.0.0.1"
@@ -69,6 +78,9 @@ class HermesConfig:
     session_key: str = ""
     model: str = "hermes-agent"
     timeout: float = 30.0
+    # Sent as a system message before each utterance. Set to "" to disable
+    # (e.g. if the persona/style is managed on the Hermes side).
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
 
 @dataclass
@@ -99,7 +111,18 @@ class STTConfig:
 @dataclass
 class TTSConfig:
     backend: str = "piper"
+    # Catalog voice name (e.g. en_GB-northern_english_male-medium), auto-
+    # downloaded into voices_dir on first use. Browse with:
+    #   hermes-satellite voices list --language en_GB
+    voice: str = ""
+    # Explicit path to a .onnx voice file; overrides `voice` when set.
     voice_path: str = ""
+    voices_dir: str = "/var/lib/hermes-satellite/voices"
+    # Multi-speaker voices (vctk, aru): which speaker to use.
+    speaker_id: Optional[int] = None
+    # Speaking pace: >1.0 slower/statelier, <1.0 brisker.
+    length_scale: Optional[float] = None
+    volume: float = 1.0
 
 
 @dataclass

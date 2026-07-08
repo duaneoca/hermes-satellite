@@ -37,9 +37,14 @@ class HermesClient(AgentClient):
         return headers
 
     def send(self, text: str, session_key: str) -> str:
+        messages = []
+        if self._cfg.system_prompt:
+            # Ask for speakable prose (replies are read aloud by TTS).
+            messages.append({"role": "system", "content": self._cfg.system_prompt})
+        messages.append({"role": "user", "content": text})
         payload = {
             "model": self._cfg.model,
-            "messages": [{"role": "user", "content": text}],
+            "messages": messages,
             "stream": False,
         }
         try:

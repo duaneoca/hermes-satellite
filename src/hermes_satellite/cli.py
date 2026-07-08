@@ -38,6 +38,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="wake word tuning mode: stream live detection scores from the mic "
              "to calibrate wakeword.threshold / patience (openwakeword only)",
     )
+
+    sub = parser.add_subparsers(dest="command")
+    voices = sub.add_parser(
+        "voices", help="browse and audition piper TTS voices on this device"
+    )
+    voices.add_argument("action", choices=["list", "preview"])
+    voices.add_argument("name", nargs="?", help="voice name (for preview)")
+    voices.add_argument(
+        "--language", default=None,
+        help="filter list by language code, e.g. en_GB",
+    )
+    voices.add_argument(
+        "--speaker", type=int, default=None,
+        help="speaker id for multi-speaker voices (vctk, aru)",
+    )
+    voices.add_argument(
+        "--text",
+        default="Good evening. All systems are operating within normal parameters.",
+        help="phrase to speak in preview",
+    )
     return parser
 
 
@@ -109,6 +129,64 @@ def _run_ww_monitor(config) -> int:
     return 0
 
 
+def _run_voices(config, args) -> int:
+    """``voices list`` / ``voices preview`` — browse and audition on-device."""
+    import dataclasses
+    import json
+    from pathlib import Path
+    from urllib.request import urlopen
+
+    if args.action == "list":
+        from piper.download_voices import VOICES_JSON
+
+        with urlopen(VOICES_JSON) as response:
+            catalog = json.load(response)
+        voices_dir = Path(config.tts.voices_dir)
+        shown = 0
+        for name in sorted(catalog):
+            if args.language and not name.startswith(args.language):
+                continue
+            entry = catalog[name]
+            speakers = entry.get("num_speakers", 1)
+            marks = []
+            if speakers > 1:
+                marks.append(f"{speakers} speakers")
+            if (voices_dir / f"{name}.onnx").exists():
+                marks.append("downloaded")
+            suffix = f"   ({', '.join(marks)})" if marks else ""
+            print(f"{name}{suffix}")
+            shown += 1
+        if not shown:
+            print(f"no voices match language {args.language!r}", file=sys.stderr)
+        return 0
+
+    # preview
+    name = args.name or config.tts.voice
+    if not name:
+        print("voices preview needs a voice name (see: voices list)", file=sys.stderr)
+        return 2
+    from .audio import build_audio
+    from .tts.piper_backend import PiperTTS
+
+    tts_cfg = dataclasses.replace(
+        config.tts, voice=name, voice_path="",
+        speaker_id=args.speaker if args.speaker is not None else config.tts.speaker_id,
+    )
+    tts = PiperTTS(tts_cfg, sample_rate=config.audio.sample_rate)
+    print(f"synthesizing with {name}"
+          + (f" speaker {tts_cfg.speaker_id}" if tts_cfg.speaker_id is not None else "")
+          + " ...", flush=True)
+    pcm = tts.synthesize(args.text)
+    _, sink = build_audio(config)
+    sink.play(pcm, tts.sample_rate)
+    print(f"({tts.sample_rate} Hz — to keep it, set in config.yaml:  "
+          f"tts.voice: {name}"
+          + (f"  tts.speaker_id: {tts_cfg.speaker_id}"
+             if tts_cfg.speaker_id is not None else "")
+          + ")")
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -123,6 +201,9 @@ def main(argv=None) -> int:
         level=getattr(logging, level, logging.INFO),
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
+
+    if getattr(args, "command", None) == "voices":
+        return _run_voices(config, args)
 
     if args.ww_monitor:
         return _run_ww_monitor(config)

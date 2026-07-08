@@ -140,3 +140,100 @@ def test_piper_loads_voice_once(monkeypatch):
     first = tts._voice
     tts.synthesize("b")
     assert tts._voice is first
+
+
+class FakeSynthesisConfig:
+    def __init__(self, speaker_id=None, length_scale=None, volume=1.0, **kw):
+        self.speaker_id = speaker_id
+        self.length_scale = length_scale
+        self.volume = volume
+
+
+class FakeVoiceKnobs:
+    """Current-API voice that records syn_config."""
+    received = None
+
+    @classmethod
+    def load(cls, path):
+        inst = cls()
+        inst.path = path
+        return inst
+
+    def synthesize(self, text, syn_config=None):
+        FakeVoiceKnobs.received = syn_config
+        yield FakeChunk(b"\x01\x02")
+
+
+def _install_piper_with_knobs(monkeypatch, voice_cls, download_calls=None):
+    piper_pkg = types.ModuleType("piper")
+    voice_mod = types.ModuleType("piper.voice")
+    dl_mod = types.ModuleType("piper.download_voices")
+    voice_mod.PiperVoice = voice_cls
+    piper_pkg.voice = voice_mod
+    piper_pkg.PiperVoice = voice_cls
+    piper_pkg.SynthesisConfig = FakeSynthesisConfig
+    sink = download_calls if download_calls is not None else []
+    dl_mod.download_voice = lambda name, d: sink.append((name, str(d)))
+    dl_mod.VOICES_JSON = "http://example/voices.json"
+    piper_pkg.download_voices = dl_mod
+    monkeypatch.setitem(sys.modules, "piper", piper_pkg)
+    monkeypatch.setitem(sys.modules, "piper.voice", voice_mod)
+    monkeypatch.setitem(sys.modules, "piper.download_voices", dl_mod)
+
+
+def test_piper_voice_name_resolves_and_downloads_once(monkeypatch, tmp_path):
+    calls = []
+    _install_piper_with_knobs(monkeypatch, FakeVoiceKnobs, calls)
+    cfg = TTSConfig(voice="en_GB-test-medium", voices_dir=str(tmp_path))
+    tts = PiperTTS(cfg)
+    tts.synthesize("hello")
+    assert calls == [("en_GB-test-medium", str(tmp_path))]
+    # once the file exists, no re-download
+    (tmp_path / "en_GB-test-medium.onnx").write_bytes(b"x")
+    tts2 = PiperTTS(cfg)
+    tts2.synthesize("again")
+    assert len(calls) == 1
+
+
+def test_piper_voice_path_overrides_name(monkeypatch, tmp_path):
+    calls = []
+    _install_piper_with_knobs(monkeypatch, FakeVoiceKnobs, calls)
+    cfg = TTSConfig(voice="ignored", voice_path="/v.onnx", voices_dir=str(tmp_path))
+    PiperTTS(cfg).synthesize("hi")
+    assert calls == []
+
+
+def test_piper_no_voice_configured_raises(monkeypatch):
+    _install_piper_with_knobs(monkeypatch, FakeVoiceKnobs)
+    with pytest.raises(RuntimeError, match="tts.voice"):
+        PiperTTS(TTSConfig()).synthesize("hi")
+
+
+def test_piper_knobs_passed_via_synthesis_config(monkeypatch):
+    _install_piper_with_knobs(monkeypatch, FakeVoiceKnobs)
+    cfg = TTSConfig(voice_path="/v.onnx", speaker_id=47, length_scale=1.1, volume=0.8)
+    PiperTTS(cfg).synthesize("hi")
+    sc = FakeVoiceKnobs.received
+    assert sc is not None
+    assert (sc.speaker_id, sc.length_scale, sc.volume) == (47, 1.1, 0.8)
+
+
+def test_piper_default_knobs_send_no_synthesis_config(monkeypatch):
+    _install_piper_with_knobs(monkeypatch, FakeVoiceKnobs)
+    FakeVoiceKnobs.received = "sentinel"
+    PiperTTS(TTSConfig(voice_path="/v.onnx")).synthesize("hi")
+    assert FakeVoiceKnobs.received is None
+
+
+def test_piper_classic_api_gets_knob_kwargs(monkeypatch):
+    received = {}
+
+    class ClassicKnobs(FakeVoiceClassic):
+        def synthesize_stream_raw(self, text, **kwargs):
+            received.update(kwargs)
+            yield b"\x01\x02"
+
+    _install_piper_with_knobs(monkeypatch, ClassicKnobs)
+    cfg = TTSConfig(voice_path="/v.onnx", speaker_id=3, length_scale=0.9)
+    PiperTTS(cfg).synthesize("hi")
+    assert received == {"speaker_id": 3, "length_scale": 0.9}
