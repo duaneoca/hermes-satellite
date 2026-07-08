@@ -45,7 +45,7 @@ behind your back.</p>
   <label>Output <select id="out_dev"></select></label>
   <label>Channels <select id="in_ch"><option>1</option><option>2</option></select></label>
   <button onclick="selectAudio()">Use selected devices</button>
-  <button onclick="post('/api/audio/tone')">Play test tone</button>
+  <button onclick="toneTest()">Play test tone</button>
 </section>
 
 <h2>3 · Microphone level</h2>
@@ -87,8 +87,8 @@ behind your back.</p>
 <h2>5 · Voice</h2>
 <section>
   <label>Voice <select id="voice"></select></label>
-  <label>Speaker <input id="spk" type="number" style="width:4.5rem"
-    placeholder="n/a"></label>
+  <label>Speaker <input id="spk" type="number" style="width:8rem"
+    title="multi-speaker voice packs (vctk, aru) bundle many people; this picks one"></label>
   <label>Pace <input id="pace" type="number" min="0.5" max="2" step="0.05"
     style="width:5rem" placeholder="1.0"></label><br>
   <input id="phrase" size="52"
@@ -156,8 +156,12 @@ function loadAudio() {
 function selectAudio() {
   const v = id => { const x = document.getElementById(id).value;
                     return x === "" ? null : x; };
-  post("/api/audio/select", {input_device: v("in_dev"),
+  return post("/api/audio/select", {input_device: v("in_dev"),
     output_device: v("out_dev"), input_channels: v("in_ch")}).then(loadPending);
+}
+function toneTest() {
+  // apply the current selection first, so the tone plays where you pointed
+  selectAudio().then(() => post("/api/audio/tone"));
 }
 function meterStart() {
   post("/api/meter/start");
@@ -244,9 +248,20 @@ function wakeStop() {
   clearInterval(wakeTimer);
   document.getElementById("wstat").textContent = "stopped";
 }
+let voiceSpeakers = {};
+function updateSpeakerField() {
+  const name = document.getElementById("voice").value.split(" ")[0];
+  const n = voiceSpeakers[name] || 1;
+  const spk = document.getElementById("spk");
+  spk.disabled = n <= 1;
+  spk.min = 0; spk.max = Math.max(n - 1, 0);
+  spk.placeholder = n > 1 ? `0–${n-1}` : "single-speaker voice";
+  if (n <= 1) spk.value = "";
+}
 function loadVoices() {
   get("/api/voices").then(v => {
     const sel = document.getElementById("voice");
+    voiceSpeakers = Object.assign({}, v.catalog);
     const opts = [];
     for (const name of v.downloaded)
       opts.push(`<option ${name===v.current?"selected":""}>${name}</option>`);
@@ -254,8 +269,10 @@ function loadVoices() {
       if (!v.downloaded.includes(name))
         opts.push(`<option>${name}${speakers>1?` (${speakers} spk)`:""}</option>`);
     sel.innerHTML = opts.join("");
+    sel.onchange = updateSpeakerField;
     if (v.speaker_id !== null) document.getElementById("spk").value = v.speaker_id;
     if (v.length_scale !== null) document.getElementById("pace").value = v.length_scale;
+    updateSpeakerField();
   });
 }
 function preview() {
