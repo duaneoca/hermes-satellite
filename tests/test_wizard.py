@@ -125,3 +125,27 @@ def test_mixer_route_parses_card_alongside_token(wizard, monkeypatch):
     assert code == 200
     assert seen["card"] == "3"
     assert body["controls"]["Capture"]["value"] == 40
+
+
+def test_hermes_prefill_masks_api_key(wizard):
+    state, base = wizard
+    state.config.hermes.host = "192.168.1.10"
+    state.config.hermes.session_key = "test-sat"
+    state.config.hermes.api_key = "sk-abcdef1234567890wxyz"
+    code, body = _get(f"{base}/api/hermes?token={state.token}")
+    assert code == 200
+    assert body["host"] == "192.168.1.10"
+    assert body["session_key"] == "test-sat"
+    assert body["api_key_hint"] == "••••wxyz"
+    # the real key must never appear anywhere in the response
+    assert "abcdef" not in json.dumps(body)
+
+
+def test_hermes_prefill_short_or_missing_key(wizard):
+    state, base = wizard
+    state.config.hermes.api_key = "short"
+    _, body = _get(f"{base}/api/hermes?token={state.token}")
+    assert body["api_key_hint"] == "••••"
+    state.config.hermes.api_key = ""
+    _, body = _get(f"{base}/api/hermes?token={state.token}")
+    assert body["api_key_hint"] == ""

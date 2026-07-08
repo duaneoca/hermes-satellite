@@ -305,6 +305,14 @@ def _make_handler(state: WizardState):
                 card = query.get("card", [""])[0]
                 self._json({"controls": mixer.get_controls(card)} if card
                            else {"error": "card required"})
+            elif route == "/api/hermes":
+                hermes = state.config.hermes
+                key = hermes.api_key
+                hint = ("••••" + key[-4:]) if len(key) > 8 else \
+                       ("••••" if key else "")
+                self._json({"host": hermes.host, "port": hermes.port,
+                            "session_key": hermes.session_key,
+                            "api_key_hint": hint})
             elif route == "/api/pending":
                 self._json(state.pending)
             else:
@@ -467,6 +475,12 @@ def _make_handler(state: WizardState):
                     result["chat"] = f"OK: {reply[:120]}"
                     state.set_pending("hermes", "host", host)
                     state.set_pending("hermes", "port", port)
+                    if body.get("api_key"):
+                        state.set_pending("hermes", "api_key", body["api_key"])
+                    if body.get("session_key") and \
+                            body["session_key"] != state.config.hermes.session_key:
+                        state.set_pending(
+                            "hermes", "session_key", body["session_key"])
                 else:
                     result["chat"] = f"HTTP {r.status_code}: {r.text[:120]}"
             except Exception as exc:

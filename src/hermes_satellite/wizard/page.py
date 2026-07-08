@@ -97,8 +97,8 @@ behind your back.</p>
 <section>
   <label>Host <input id="hh" size="14"></label>
   <label>Port <input id="hp" size="5"></label>
-  <label>API key <input id="hk" size="24" type="password"
-    placeholder="(from config/env)"></label>
+  <label>Session <input id="hs" size="12" title="per-device memory scope"></label>
+  <label>API key <input id="hk" size="24" type="password"></label>
   <button onclick="hermesTest()">Test connection + chat</button>
   <p id="hres"></p>
 </section>
@@ -253,10 +253,21 @@ function preview() {
     loadPending();
   });
 }
+function loadHermes() {
+  get("/api/hermes").then(h => {
+    document.getElementById("hh").value = h.host || "";
+    document.getElementById("hp").value = h.port || "";
+    document.getElementById("hs").value = h.session_key || "";
+    document.getElementById("hk").placeholder = h.api_key_hint
+      ? `configured ${h.api_key_hint} — leave blank to keep`
+      : "no key configured";
+  });
+}
 function hermesTest() {
   document.getElementById("hres").textContent = "testing…";
   post("/api/hermes/test", {host: document.getElementById("hh").value,
     port: document.getElementById("hp").value,
+    session_key: document.getElementById("hs").value,
     api_key: document.getElementById("hk").value})
   .then(r => {
     document.getElementById("hres").innerHTML =
@@ -279,7 +290,7 @@ function save() {
     el.textContent = `written: ${r.written}\\n\\n${r.note}\\n  ${r.command}`;
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes();
 </script>
 </body>
 </html>
