@@ -21,7 +21,7 @@ amixer -q -c "$C" sset 'Left Boost Mixer LINPUT1' on
 amixer -q -c "$C" sset 'Right Boost Mixer RINPUT1' on
 amixer -q -c "$C" sset 'Capture' 63 cap
 amixer -q -c "$C" sset 'ADC PCM' 220
-amixer -q -c "$C" sset 'ALC Function' None
+amixer -q -c "$C" sset 'ALC Function' Off
 
 # --- playback path: DAC -> output mixer -> speaker/headphone
 amixer -q -c "$C" sset 'Left Output Mixer PCM' on

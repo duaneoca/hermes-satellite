@@ -44,7 +44,7 @@ behind your back.</p>
   <label>Input <select id="in_dev"></select></label>
   <label>Output <select id="out_dev"></select></label>
   <label>Channels <select id="in_ch"><option>1</option><option>2</option></select></label>
-  <button onclick="selectAudio()">Use these</button>
+  <button onclick="selectAudio()">Use selected devices</button>
   <button onclick="post('/api/audio/tone')">Play test tone</button>
 </section>
 
@@ -52,14 +52,18 @@ behind your back.</p>
 <section>
   <p class="muted">Speak from where you normally will. Target: p99 in the
   30–70% zone. Tune gain with <code>alsamixer</code> / the wm8960 script.</p>
-  <button onclick="meterStart()">Start meter</button>
+  <button onclick="meterStart()">Start microphone test</button>
   <button onclick="meterStop()">Stop</button>
   <div class="meter" id="rmsbar"><div></div></div>
   <p>live <span id="rms">–</span>% &nbsp; p99(3s) <b id="p99">–</b>%</p>
-  <h3 style="font-size:.95rem">Mixer (ALSA)</h3>
+  <h3 style="font-size:.95rem">Levels</h3>
+  <p class="muted">New ReSpeaker HAT? Click auto-configure first — it turns on
+  the microphone/speaker signal paths (off by default on this chip) and sets
+  recommended levels. Then fine-tune with the sliders while watching the
+  meter above.</p>
   <label>Card <select id="card" onchange="loadMixer()"></select></label>
-  <button onclick="applyRecipe()">Apply WM8960 recipe</button>
-  <button onclick="mixerStore()">Persist (alsactl store)</button>
+  <button onclick="applyRecipe()">Auto-configure microphone &amp; speaker</button>
+  <button onclick="mixerStore()">Keep levels after reboot</button>
   <span id="mixmsg" class="muted"></span>
   <div id="sliders"></div>
 </section>
@@ -68,7 +72,7 @@ behind your back.</p>
 <section>
   <p class="muted">Start, then say the wake phrase a few times. Threshold
   should sit comfortably below your spoken scores and above ambient.</p>
-  <button onclick="wakeStart()">Start monitor</button>
+  <button onclick="wakeStart()">Start listening test</button>
   <button onclick="post('/api/wake/stop')">Stop</button>
   <label>Threshold <input id="thr" type="number" min="0.05" max="1" step="0.05"
     style="width:5rem" onchange="post('/api/wake/config',{threshold:this.value})"></label>
@@ -108,8 +112,9 @@ behind your back.</p>
 
 <script>
 const TOKEN = "__TOKEN__";
-const get  = (p)    => fetch(p + "?token=" + TOKEN).then(r => r.json());
-const post = (p, b) => fetch(p + "?token=" + TOKEN, {method: "POST",
+const tok  = (p)    => p + (p.includes("?") ? "&" : "?") + "token=" + TOKEN;
+const get  = (p)    => fetch(tok(p)).then(r => r.json());
+const post = (p, b) => fetch(tok(p), {method: "POST",
   headers: {"Content-Type": "application/json"},
   body: JSON.stringify(b || {})}).then(r => r.json());
 let meterTimer = null, wakeTimer = null;
@@ -182,7 +187,7 @@ function loadMixer() {
         ` <span>${c.value}/${c.max}</span></label>`);
     }
     document.getElementById("sliders").innerHTML = rows.join("") ||
-      "<p class='muted'>no adjustable controls found on this card</p>";
+      "<p class='muted'>no adjustable controls found on this card — is it the right card?</p>";
   });
 }
 function setMixer(control, value) {
@@ -196,15 +201,17 @@ function applyRecipe() {
   document.getElementById("mixmsg").textContent = "applying…";
   post("/api/mixer/recipe", {card: card}).then(r => {
     document.getElementById("mixmsg").textContent =
-      `applied ${r.applied.length} controls` +
-      (r.failed.length ? `; failed: ${r.failed.join(", ")}` : "");
+      r.failed.length
+        ? `configured with warnings (${r.failed.join(", ")})`
+        : "audio paths configured ✓";
     loadMixer();
   });
 }
 function mixerStore() {
   post("/api/mixer/store").then(r => {
     document.getElementById("mixmsg").textContent =
-      r.ok ? "persisted ✓" : (r.hint || r.error || "failed");
+      r.ok ? "saved — levels will survive reboot ✓"
+           : (r.hint || r.error || "failed");
   });
 }
 function wakeStart() {

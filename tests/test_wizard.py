@@ -107,3 +107,18 @@ def test_unknown_route_404(wizard):
     with pytest.raises(urllib.error.HTTPError) as e:
         _get(f"{base}/api/nope?token={state.token}")
     assert e.value.code == 404
+
+
+def test_mixer_route_parses_card_alongside_token(wizard, monkeypatch):
+    """Regression: /api/mixer?card=3&token=... must authorize AND see the card
+    (the page once produced ?card=3?token=..., which 403'd)."""
+    from hermes_satellite.wizard import mixer as mixer_mod
+    seen = {}
+    monkeypatch.setattr(mixer_mod, "get_controls",
+                        lambda card: seen.setdefault("card", card) or
+                        {"Capture": {"value": 40, "max": 63, "switch": "on"}})
+    state, base = wizard
+    code, body = _get(f"{base}/api/mixer?card=3&token={state.token}")
+    assert code == 200
+    assert seen["card"] == "3"
+    assert body["controls"]["Capture"]["value"] == 40

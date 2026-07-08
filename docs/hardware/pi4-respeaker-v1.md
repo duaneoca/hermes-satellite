@@ -99,7 +99,7 @@ p99 ≈ 34%. Calibration rules learned the hard way:
   opposite: back `Capture` off first.
 - **If raising gain doesn't raise the peak**, check the automatic level
   control isn't overriding the PGA: `amixer -c $C sget 'ALC Function'` must be
-  `None` (`amixer -c $C sset 'ALC Function' None`).
+  `Off` (`amixer -c $C sset 'ALC Function' Off`).
 
 When it lands in range, persist everything: `sudo alsactl store`.
 

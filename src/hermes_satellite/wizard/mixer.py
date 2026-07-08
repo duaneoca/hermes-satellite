@@ -34,7 +34,7 @@ RECIPE = (
     ("Right Boost Mixer RINPUT1", ["on"]),
     ("Capture", ["63", "cap"]),
     ("ADC PCM", ["220"]),
-    ("ALC Function", ["None"]),
+    ("ALC Function", ["Off"]),
     ("Left Output Mixer PCM", ["on"]),
     ("Right Output Mixer PCM", ["on"]),
     ("Playback", ["255"]),
