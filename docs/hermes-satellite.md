@@ -208,12 +208,17 @@ stays your user's and is unrelated to the deployed copy.
    ```
    (Add `HERMES_SESSION_KEY=...` to secrets.env if you prefer it out of the
    yaml too; it's a scoping label rather than a credential.)
-3. Data directory (the only place the service writes) — move models in and
-   pre-seed the Moonshine cache so first start needs no egress:
+3. Data directory (the only place the service writes) — the Piper voice is
+   already here from the wizard; pre-seed the Moonshine STT model so first
+   start needs no download. **Note:** `~/.cache/moonshine_voice` only exists
+   if you ever ran the daemon interactively — on the wizard-first path it
+   doesn't (the wizard doesn't exercise STT), so download straight into the
+   service location:
    ```bash
    sudo mkdir -p /var/lib/hermes-satellite/cache
-   # Piper voice etc. should already live here per the setup docs; then:
-   sudo cp -r ~/.cache/moonshine_voice /var/lib/hermes-satellite/cache/
+   sudo XDG_CACHE_HOME=/var/lib/hermes-satellite/cache /opt/hermes-satellite/.venv/bin/python -c "import moonshine_voice as mv; mv.get_model_for_language('en', mv.ModelArch.BASE)"
+   # (or, if ~/.cache/moonshine_voice exists from interactive runs:
+   #  sudo cp -r ~/.cache/moonshine_voice /var/lib/hermes-satellite/cache/ )
    sudo chown -R hermes-sat:hermes-sat /var/lib/hermes-satellite
    ```
 4. Install and start the unit:
