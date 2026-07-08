@@ -381,8 +381,18 @@ class WizardState:
                         k, _, v = line.partition("=")
                         existing[k.strip()] = v.strip()
             existing.update(secrets_out)
+
+            def _env_value(value):
+                # Quote when whitespace/#/; could confuse env-file parsers
+                # (systemd EnvironmentFile strips one matched pair, as does
+                # our loader).
+                if any(ch in value for ch in " \t#;"):
+                    return f'"{value}"'
+                return value
+
             secrets_path.write_text(
-                "".join(f"{k}={v}\n" for k, v in sorted(existing.items()))
+                "".join(f"{k}={_env_value(v)}\n"
+                        for k, v in sorted(existing.items()))
             )
             secrets_path.chmod(0o600)
         return {

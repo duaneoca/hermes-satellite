@@ -115,8 +115,9 @@ behind your back.</p>
   the Mosquitto add-on).</p>
   <label><input id="me" type="checkbox"
     onchange="post('/api/mqtt/config',{enabled:this.checked}).then(loadPending)">
-    Enable</label>
-  <label>Broker <input id="mh" size="14"></label>
+    Enable Home Assistant integration</label><br>
+  <label>Server <input id="mh" size="14"
+    title="your MQTT broker — usually the Home Assistant / Mosquitto host"></label>
   <label>Port <input id="mp" size="5"></label>
   <label>User <input id="mu" size="10"></label>
   <label>Password <input id="mw" size="16" type="password"></label>

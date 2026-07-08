@@ -410,3 +410,14 @@ def test_mqtt_test_success_pends_settings(wizard, monkeypatch):
     import yaml
     assert yaml.safe_load(open(state.config_path))["mqtt"]["password"] == ""
     assert "MQTT_PASSWORD=pw" in open(result["secrets"]).read()
+
+
+def test_save_quotes_secrets_with_spaces(wizard):
+    state, base = wizard
+    state.config.mqtt.password = "has spaces #and hash"
+    _, result = _post(f"{base}/api/save?token={state.token}")
+    content = open(result["secrets"]).read()
+    assert 'MQTT_PASSWORD="has spaces #and hash"' in content
+    # round-trip through the loader
+    from hermes_satellite.config import load_config
+    assert load_config(state.config_path).mqtt.password == "has spaces #and hash"

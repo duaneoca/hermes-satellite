@@ -279,7 +279,12 @@ def _read_secrets_env(path) -> dict:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, _, value = line.partition("=")
-            secrets[key.strip()] = value.strip().strip("'\"")
+            value = value.strip()
+            # Unwrap one matched pair of quotes only — never eat quote
+            # characters that are genuinely part of the secret.
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                value = value[1:-1]
+            secrets[key.strip()] = value
     except OSError:
         pass
     return secrets

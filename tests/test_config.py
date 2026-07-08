@@ -205,3 +205,19 @@ def test_real_env_beats_secrets_env_file(tmp_path, monkeypatch):
           model_path: hey_jarvis
     """))
     assert cfg.hermes.api_key == "from-env"
+
+
+def test_secrets_env_quote_handling(tmp_path, monkeypatch):
+    monkeypatch.delenv("MQTT_PASSWORD", raising=False)
+    monkeypatch.delenv("HERMES_API_KEY", raising=False)
+    (tmp_path / "secrets.env").write_text(
+        'MQTT_PASSWORD="pa!ss.wo*rd"\n'      # matched quotes unwrapped
+        "HERMES_API_KEY=sk-end-in-quote\"\n"  # unmatched quote preserved
+    )
+    cfg = load_config(_write(tmp_path, """
+        hardware_profile: mock
+        wakeword:
+          model_path: hey_jarvis
+    """))
+    assert cfg.mqtt.password == "pa!ss.wo*rd"
+    assert cfg.hermes.api_key == 'sk-end-in-quote"'
