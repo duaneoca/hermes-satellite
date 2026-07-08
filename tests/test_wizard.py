@@ -81,18 +81,22 @@ def test_wake_config_clamps_via_live_config(wizard):
     assert state.config.wakeword.threshold == 0.8
 
 
-def test_save_writes_review_file_with_changes(wizard, tmp_path):
+def test_save_backs_up_then_overwrites_in_place(wizard, tmp_path):
     state, base = wizard
+    original = open(state.config_path).read()
     _post(f"{base}/api/audio/select?token={state.token}", {"input_device": 1})
     code, result = _post(f"{base}/api/save?token={state.token}")
-    assert result["written"].endswith("config.yaml.new")
-    assert result["changes"] == {"audio.input_device": 1}
-    assert "mv " in result["command"]
     import yaml
-    saved = yaml.safe_load(open(result["written"]))
+    # config updated in place
+    assert result["written"] == state.config_path
+    saved = yaml.safe_load(open(state.config_path))
     assert saved["audio"]["input_device"] == 1
     assert saved["hardware_profile"] == "mock"
     assert saved["wakeword"]["model_path"] == "hey_jarvis"
+    # previous content preserved in a timestamped backup
+    assert ".bak-" in result["backup"]
+    assert open(result["backup"]).read() == original
+    assert result["changes"] == {"audio.input_device": 1}
 
 
 def test_exit_sets_shutdown_event(wizard):
@@ -149,3 +153,44 @@ def test_hermes_prefill_short_or_missing_key(wizard):
     state.config.hermes.api_key = ""
     _, body = _get(f"{base}/api/hermes?token={state.token}")
     assert body["api_key_hint"] == ""
+
+
+def test_wake_monitor_ready_flag_and_callbacks(wizard, monkeypatch):
+    """ready flips only when audio actually flows; listening/stop callbacks fire."""
+    import hermes_satellite.wakeword as ww_pkg
+    from hermes_satellite.wizard.server import _WakeMonitor
+
+    class FakeDetector:
+        def __init__(self):
+            self.on_score = None
+            self.on_audio = None
+
+        def wait_for_wake(self, is_muted):
+            self.on_audio(b"\x00\x00")
+            self.on_audio(b"\x00\x00")
+            self.on_score({"hey_jarvis": 0.42})
+            return False  # end the monitor
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(ww_pkg, "build_wakeword",
+                        lambda config, demo=False, mic=None: FakeDetector())
+    import hermes_satellite.audio.mic as mic_mod
+
+    class FakeMic:
+        def __init__(self, **kw): pass
+        def start(self): pass
+        def close(self): pass
+
+    monkeypatch.setattr(mic_mod, "MicStream", FakeMic)
+
+    state, base = wizard
+    events = []
+    monitor = _WakeMonitor(state.config)
+    monitor.on_listening = lambda: events.append(("listening", monitor.ready))
+    monitor.on_stopped = lambda: events.append(("stopped", monitor.ready))
+    monitor.start()
+    monitor._thread.join(timeout=5)
+    assert events == [("listening", True), ("stopped", False)]
+    assert monitor.last == 0.42

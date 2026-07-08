@@ -73,7 +73,8 @@ behind your back.</p>
   <p class="muted">Start, then say the wake phrase a few times. Threshold
   should sit comfortably below your spoken scores and above ambient.</p>
   <button onclick="wakeStart()">Start listening test</button>
-  <button onclick="post('/api/wake/stop')">Stop</button>
+  <button onclick="wakeStop()">Stop</button>
+  <b id="wstat" class="muted"></b>
   <label>Threshold <input id="thr" type="number" min="0.05" max="1" step="0.05"
     style="width:5rem" onchange="post('/api/wake/config',{threshold:this.value})"></label>
   <p>last <b id="wl">–</b> · best <b id="wb">–</b> ·
@@ -106,7 +107,8 @@ behind your back.</p>
 <h2>7 · Review &amp; save</h2>
 <section>
   <pre id="pending">(no changes yet)</pre>
-  <button onclick="save()">Write config for review</button>
+  <button onclick="save()">Save configuration</button>
+  <span class="muted">(previous config is kept as a timestamped backup)</span>
   <pre id="saved" style="display:none"></pre>
 </section>
 
@@ -220,8 +222,12 @@ function mixerStore() {
 }
 function wakeStart() {
   post("/api/wake/start");
+  document.getElementById("wstat").textContent = "starting (loading model)…";
   clearInterval(wakeTimer);
   wakeTimer = setInterval(() => get("/api/wake").then(w => {
+    document.getElementById("wstat").textContent = w.error ? "" :
+      (w.ready ? "● listening — say the wake phrase (LEDs are lit)"
+               : "starting (loading model)…");
     document.getElementById("wl").textContent = w.last.toFixed(3);
     document.getElementById("wb").textContent = w.best.toFixed(3);
     document.getElementById("wd").textContent = w.detections;
@@ -229,6 +235,11 @@ function wakeStart() {
     if (!document.getElementById("thr").value)
       document.getElementById("thr").value = w.threshold;
   }), 300);
+}
+function wakeStop() {
+  post("/api/wake/stop");
+  clearInterval(wakeTimer);
+  document.getElementById("wstat").textContent = "stopped";
 }
 function loadVoices() {
   get("/api/voices").then(v => {
@@ -291,7 +302,10 @@ function save() {
   post("/api/save").then(r => {
     const el = document.getElementById("saved");
     el.style.display = "block";
-    el.textContent = `written: ${r.written}\\n\\n${r.note}\\n  ${r.command}`;
+    el.textContent = r.error ? ("failed: " + r.error)
+      : `saved ✓ ${r.written}\\n` +
+        (r.backup ? `previous config kept at ${r.backup}\\n` : "") +
+        "restart the daemon to apply.";
   });
 }
 loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes();

@@ -123,6 +123,11 @@ class _WakeMonitor:
         self.last = 0.0
         self.detections = 0
         self.error = ""
+        # True once the first audio frame has actually been scored — model
+        # load takes seconds on a Pi, and users say the phrase too early.
+        self.ready = False
+        self.on_listening = None   # callback: scoring has begun
+        self.on_stopped = None     # callback: monitor ended
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -130,6 +135,7 @@ class _WakeMonitor:
         self.best = self.last = 0.0
         self.detections = 0
         self.error = ""
+        self.ready = False
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -155,7 +161,14 @@ class _WakeMonitor:
                 self.last = round(float(score), 3)
                 self.best = max(self.best, self.last)
 
+            def on_audio(_pcm):
+                if not self.ready:
+                    self.ready = True
+                    if self.on_listening:
+                        self.on_listening()
+
             detector.on_score = on_score
+            detector.on_audio = on_audio
             try:
                 while detector.wait_for_wake(lambda: False):
                     self.detections += 1
@@ -164,6 +177,10 @@ class _WakeMonitor:
         except Exception as exc:
             logger.error("wake monitor failed: %s", exc)
             self.error = str(exc)
+        finally:
+            self.ready = False
+            if self.on_stopped:
+                self.on_stopped()
 
 
 class WizardState:
@@ -177,6 +194,32 @@ class WizardState:
         self.last_request = time.monotonic()
         self.idle_timeout_s = idle_timeout_s
         self.shutdown_event = threading.Event()
+        self._leds = None
+        # Show "listening" on the real HAT LEDs while the wake test runs —
+        # the daemon is stopped during setup, so the LEDs are ours to use.
+        self.wake.on_listening = lambda: self._led("recording")
+        self.wake.on_stopped = lambda: self._led("off")
+
+    def _led(self, name: str) -> None:
+        try:
+            from ..leds import build_led_controller
+            from ..leds.base import LEDState
+
+            if self._leds is None:
+                self._leds = build_led_controller(self.config)
+                self._leds.start()
+            self._leds.set_state(
+                LEDState.RECORDING if name == "recording" else LEDState.OFF
+            )
+        except Exception as exc:  # cosmetic: never break the wizard over LEDs
+            logger.debug("wizard LEDs unavailable: %s", exc)
+
+    def close_leds(self) -> None:
+        if self._leds is not None:
+            try:
+                self._leds.stop()
+            except Exception:
+                pass
 
     # -- change tracking -------------------------------------------------------
     def set_pending(self, section: str, field: str, value):
@@ -223,13 +266,24 @@ class WizardState:
             data[section] = {
                 k: v for k, v in obj.__dict__.items() if not k.startswith("_")
             }
-        new_path = str(self.config_path) + ".new"
-        Path(new_path).write_text(yaml.safe_dump(data, sort_keys=False))
+        target = Path(self.config_path)
+        backup = None
+        try:
+            if target.exists():
+                stamp = time.strftime("%Y%m%d-%H%M%S")
+                backup = target.with_name(f"{target.name}.bak-{stamp}")
+                backup.write_text(target.read_text())
+            target.write_text(yaml.safe_dump(data, sort_keys=False))
+        except PermissionError:
+            return {
+                "error": f"{target} is not writable by this user — rerun the "
+                         "wizard with sudo, or point --config at a writable "
+                         "copy",
+            }
         return {
-            "written": new_path,
+            "written": str(target),
+            "backup": str(backup) if backup else None,
             "changes": self.pending,
-            "note": "Review it, then move it into place:",
-            "command": f"mv {new_path} {self.config_path}",
         }
 
 
@@ -304,6 +358,7 @@ def _make_handler(state: WizardState):
                 self._json({"best": state.wake.best, "last": state.wake.last,
                             "detections": state.wake.detections,
                             "threshold": state.config.wakeword.threshold,
+                            "ready": state.wake.ready,
                             "error": state.wake.error})
             elif route == "/api/voices":
                 self._voices()
@@ -532,6 +587,7 @@ def run_wizard(config, config_path: str, host: str = "0.0.0.0",
         pass
     state.meter.stop()
     state.wake.stop()
+    state.close_leds()
     server.shutdown()
     print("wizard closed; no ports remain open.", flush=True)
     return 0

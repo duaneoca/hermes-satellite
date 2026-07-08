@@ -38,13 +38,19 @@ open**.
    and Persist (`alsactl store`; falls back to printing the sudo
    command if it needs root). Only whitelisted controls are settable.
 4. **Wake word** — live score monitor + detection counter; set the
-   threshold from evidence.
+   threshold from evidence. Model load takes a few seconds on a Pi:
+   the page shows "starting" until scoring actually begins, and the
+   HAT LEDs light in the listening color while the test is live —
+   don't say the phrase until you see them.
 5. **Voice** — full catalog + downloaded voices, on-device preview with
    speaker/pace knobs (downloads on demand).
 6. **Hermes** — health + authenticated round-trip chat test.
-7. **Review & save** — collected changes are written to
-   `<config>.yaml.new` for *your* review, with the `mv` command printed.
-   The wizard never rewrites your config behind your back.
+7. **Review & save** — collected changes are listed; **Save
+   configuration** first copies your current config to a timestamped
+   backup (`config.yaml.bak-YYYYMMDD-HHMMSS`) and then updates
+   `config.yaml` in place. Restart the daemon to apply. (Comments in the
+   config file are not preserved by the rewrite — they live on in the
+   backup.)
 
 Changes made in sections 2–6 apply to the wizard's live session immediately
 (so previews/tests use them), and land in the review file at the end.
