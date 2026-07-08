@@ -43,17 +43,16 @@ class HermesClient(AgentClient):
             headers["X-Hermes-Session-Key"] = key
         return headers
 
-    def send(self, text: str, session_key: str) -> str:
+    def _payload(self, text: str, stream: bool) -> dict:
         messages = []
         if self._cfg.system_prompt:
             # Ask for speakable prose (replies are read aloud by TTS).
             messages.append({"role": "system", "content": self._cfg.system_prompt})
         messages.append({"role": "user", "content": text})
-        payload = {
-            "model": self._cfg.model,
-            "messages": messages,
-            "stream": False,
-        }
+        return {"model": self._cfg.model, "messages": messages, "stream": stream}
+
+    def send(self, text: str, session_key: str) -> str:
+        payload = self._payload(text, stream=False)
         try:
             resp = self._session.post(
                 self._url,
@@ -85,3 +84,56 @@ class HermesClient(AgentClient):
         if content is None:
             raise HermesError("Hermes response had null content")
         return str(content)
+
+    def send_stream(self, text: str, session_key: str):
+        """Yield reply text deltas as they arrive (SSE, ``stream: true``).
+
+        The configured ``timeout`` applies per-read in streaming mode — i.e.
+        it bounds the silence *between* chunks, not the total reply time,
+        which is the right semantics for a long-thinking agent. Raises
+        :class:`HermesError`; failures before the first delta are safe to
+        retry non-streaming.
+        """
+        import json as _json
+
+        try:
+            resp = self._session.post(
+                self._url,
+                json=self._payload(text, stream=True),
+                headers=self._headers(session_key),
+                timeout=self._cfg.timeout,
+                stream=True,
+            )
+        except requests.Timeout as exc:
+            raise HermesError(
+                f"Hermes stream timed out after {self._cfg.timeout}s") from exc
+        except requests.RequestException as exc:
+            raise HermesError(f"Hermes stream failed: {exc}") from exc
+        if resp.status_code != 200:
+            body = resp.text[:200]
+            resp.close()
+            raise HermesError(f"Hermes returned HTTP {resp.status_code}: {body}")
+
+        def deltas():
+            try:
+                for raw in resp.iter_lines(decode_unicode=True):
+                    if not raw or not raw.startswith("data:"):
+                        continue
+                    data = raw[5:].strip()
+                    if data == "[DONE]":
+                        return
+                    try:
+                        chunk = _json.loads(data)
+                        delta = chunk["choices"][0].get("delta", {})
+                        content = delta.get("content")
+                    except (ValueError, KeyError, IndexError, TypeError) as exc:
+                        raise HermesError(
+                            f"Unexpected stream chunk: {data[:120]}") from exc
+                    if content:
+                        yield content
+            except requests.RequestException as exc:
+                raise HermesError(f"Hermes stream broke mid-reply: {exc}") from exc
+            finally:
+                resp.close()
+
+        return deltas()

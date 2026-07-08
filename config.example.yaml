@@ -52,8 +52,16 @@ hermes:
   session_key: ""
   # Model name passed in the chat/completions request body.
   model: hermes-agent
-  # Request timeout in seconds.
+  # Request timeout in seconds (per-read when streaming: bounds the gap
+  # between chunks, not total reply time).
   timeout: 30.0
+  # Stream the reply (SSE) and speak it sentence-by-sentence as it arrives —
+  # first audio within a few seconds instead of after the whole reply.
+  # Falls back to non-streaming automatically if the stream can't start.
+  stream: true
+  # A system message sent before each utterance; defaults to an instruction
+  # to answer in short, speakable plain prose. Set "" to disable.
+  # system_prompt: ""
 
 audio:
   backend: alsa            # alsa | mock
@@ -108,6 +116,20 @@ mqtt:
 # Writable data directory: models, caches, runtime setting overrides
 # (knobs changed from HA persist to {data_dir}/runtime.yaml).
 data_dir: /var/lib/hermes-satellite
+
+# Short audio cues so you don't need to see the LEDs: a chime when the wake
+# word fires, a tone on error. Generated tones, no files to install.
+earcons:
+  enabled: true
+  volume: 0.5              # 0-1, relative to full scale
+
+# Conversation behaviour.
+conversation:
+  # Follow-up mode: after a reply, listen again briefly so you can continue
+  # ("what about tomorrow?") without repeating the wake word.
+  follow_up: false
+  follow_up_seconds: 6.0   # how long to wait for a follow-up to begin
+  max_turns: 8             # safety cap on back-to-back follow-ups
 
 leds:
   backend: apa102          # apa102 | mock

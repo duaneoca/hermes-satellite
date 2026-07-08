@@ -132,6 +132,23 @@ needed.
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
 
+## Earcons & follow-up mode
+
+Two conversational conveniences layer on the pipeline (`core/pipeline.py`):
+
+- **Earcons** (`core/earcons.py`): short synthesized tones — a rising chime
+  the instant the wake word fires (so you know it heard you without watching
+  the LEDs) and a falling tone on error. No bundled audio; tones are generated
+  at runtime and played through the same `AudioSink` as speech. `earcons:
+  {enabled, volume}` in config.
+- **Follow-up mode** (`conversation.follow_up`): after a reply, capture
+  re-opens for `follow_up_seconds` so a continuation needs no wake word. A
+  follow-up turn is modeled as a **virtual wake** — it dispatches the same
+  `WAKE_DETECTED` and reuses the `IDLE→WAKE→RECORD` transitions, so the state
+  machine and LEDs need no special cases. A soft "listening" chime marks each
+  re-open; `conversation.max_turns` caps consecutive follow-ups. The mic is
+  flushed after each chime so the tone's own echo can't false-trigger capture.
+
 ## Logging & SD-card wear
 
 - The daemon logs via Python logging to stderr → **journald** under

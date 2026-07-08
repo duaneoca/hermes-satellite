@@ -50,3 +50,31 @@ def test_plain_prose_untouched():
 
 def test_empty():
     assert make_speakable("") == ""
+
+
+# --- sentence chunker ---------------------------------------------------
+
+from hermes_satellite.core.speech_text import iter_sentences
+
+
+def test_chunker_emits_sentences_across_delta_boundaries():
+    deltas = ["It is currently 2.", "47 PM Pacific Time. ",
+              "Tomorrow looks sunny and warm", ". Enjoy your afternoon!"]
+    out = list(iter_sentences(deltas))
+    assert out[0] == "It is currently 2.47 PM Pacific Time."
+    assert out[1] == "Tomorrow looks sunny and warm."
+    assert out[2] == "Enjoy your afternoon!"
+
+
+def test_chunker_merges_short_fragments_forward():
+    out = list(iter_sentences(["Yes. It will rain heavily this evening. "]))
+    assert out == ["Yes. It will rain heavily this evening."]
+
+
+def test_chunker_tail_without_punctuation_is_flushed():
+    assert list(iter_sentences(["no punctuation at all"])) == \
+        ["no punctuation at all"]
+
+
+def test_chunker_empty_stream():
+    assert list(iter_sentences([])) == []

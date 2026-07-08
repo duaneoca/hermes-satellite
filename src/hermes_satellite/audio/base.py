@@ -14,10 +14,15 @@ class AudioSource(ABC):
     """Captures a single spoken utterance, VAD-gated."""
 
     @abstractmethod
-    def capture_utterance(self, is_muted: Callable[[], bool]) -> bytes:
+    def capture_utterance(
+        self, is_muted: Callable[[], bool], onset_timeout: Optional[float] = None
+    ) -> bytes:
         """Capture until end-of-speech and return 16-bit PCM.
 
-        Returns empty bytes if muted throughout or if no speech is detected.
+        ``onset_timeout`` overrides how long to wait for speech to *begin*
+        before giving up (``None`` = the configured ``speech_timeout_seconds``);
+        follow-up mode passes a short window. Returns empty bytes if muted
+        throughout or if no speech starts within the window.
         """
 
 

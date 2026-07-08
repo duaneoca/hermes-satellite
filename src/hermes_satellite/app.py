@@ -84,6 +84,11 @@ class SatelliteApp:
         hermes = build_hermes(config, demo=demo)
         self.tts = tts
 
+        from .core.earcons import Earcons
+
+        earcons = Earcons(config.earcons, audio_sink,
+                          sample_rate=config.audio.sample_rate)
+
         self.pipeline = Pipeline(
             state_machine=self.sm,
             wakeword=wakeword,
@@ -94,6 +99,10 @@ class SatelliteApp:
             audio_sink=audio_sink,
             session_key=config.hermes.session_key,
             is_muted=self.mute.is_muted,
+            earcons=earcons,
+            conversation=config.conversation,
+            mic_flush=(self._mic.flush if self._mic is not None else None),
+            stream_replies=config.hermes.stream,
         )
 
     @classmethod

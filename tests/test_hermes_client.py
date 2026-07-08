@@ -105,3 +105,46 @@ def test_session_key_too_long_or_control_chars_rejected():
         client.send("hi", session_key="x" * 257)
     with _pytest.raises(HermesError, match="control"):
         client.send("hi", session_key="bad\nkey")
+
+
+def _sse_body(*chunks, done=True):
+    lines = []
+    for c in chunks:
+        import json as _j
+        lines.append("data: " + _j.dumps(
+            {"choices": [{"delta": {"content": c}}]}))
+        lines.append("")
+    if done:
+        lines.append("data: [DONE]")
+    return "\n".join(lines)
+
+
+@responses.activate
+def test_send_stream_yields_deltas_and_sets_stream_true():
+    responses.add(responses.POST, URL, body=_sse_body("Hel", "lo ", "there."),
+                  status=200, content_type="text/event-stream")
+    client = HermesClient(_config())
+    out = list(client.send_stream("hi", session_key="d"))
+    assert out == ["Hel", "lo ", "there."]
+    import json
+    body = json.loads(responses.calls[0].request.body)
+    assert body["stream"] is True
+    assert responses.calls[0].request.headers["X-Hermes-Session-Key"] == "d"
+
+
+@responses.activate
+def test_send_stream_http_error_raises_before_iteration():
+    responses.add(responses.POST, URL, body="nope", status=401)
+    client = HermesClient(_config())
+    with pytest.raises(HermesError, match="401"):
+        client.send_stream("hi", session_key="d")
+
+
+@responses.activate
+def test_send_stream_bad_chunk_raises_mid_iteration():
+    responses.add(responses.POST, URL, body="data: {not json}\n\n",
+                  status=200, content_type="text/event-stream")
+    client = HermesClient(_config())
+    gen = client.send_stream("hi", session_key="d")
+    with pytest.raises(HermesError, match="stream chunk"):
+        list(gen)

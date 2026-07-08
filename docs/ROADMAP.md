@@ -18,8 +18,8 @@ misleading level metrics), not the config file itself.
   standalone CLI one-shot remains): one-shot health check — card present, mixer
   routing sane, capture level in range, SPI node, group membership, Hermes
   reachability, onnxruntime version (< 1.27), model files present.
-- Earcons (wake chime / error tone) — audio feedback so users aren't
-  dependent on seeing the LEDs. **Next up.**
+- ✅ Earcons (wake chime / error tone) — shipped 2026-07-08.
+- ✅ Follow-up conversation mode — shipped 2026-07-08.
 - Wizard transcription-test section (exam finding: STT is the one stage
   the wizard never exercises; would also pre-warm the Moonshine cache).
 
@@ -52,10 +52,9 @@ writes config.yaml, and **exits**. Steady-state listening ports remain zero.
 Reuses the proven guts: --ww-monitor, voices preview, wm8960-mixer.sh.
 
 **Also V2:**
-- Follow-up conversation mode (re-open capture for N seconds after a reply,
-  no wake word needed).
-- SSE streaming from Hermes + sentence-chunked Piper synthesis (cut
-  time-to-first-audio).
+  (Follow-up conversation mode — shipped; see above.)
+- ✅ SSE streaming from Hermes + sentence-chunked Piper synthesis —
+  shipped 2026-07-08.
 
 ## V2+ — maybe
 

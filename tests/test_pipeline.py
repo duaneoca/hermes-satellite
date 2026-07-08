@@ -1,0 +1,264 @@
+"""Pipeline orchestration: earcons, follow-up mode, virtual-wake transitions."""
+
+from hermes_satellite.config import ConversationConfig
+from hermes_satellite.core.events import StateMachine
+from hermes_satellite.core.states import State
+from hermes_satellite.core.pipeline import Pipeline
+
+
+class FakeWake:
+    def __init__(self, results):
+        self._r = list(results)
+        self.on_exhausted = None  # lets run_forever tests stop the loop
+
+    def wait_for_wake(self, is_muted):
+        if self._r:
+            return self._r.pop(0)
+        if self.on_exhausted is not None:
+            self.on_exhausted()
+        return False
+
+    def stop(self):
+        pass
+
+
+class FakeSource:
+    def __init__(self, utterances):
+        self._u = list(utterances)
+        self.onsets = []
+
+    def capture_utterance(self, is_muted, onset_timeout=None):
+        self.onsets.append(onset_timeout)
+        return self._u.pop(0) if self._u else b""
+
+
+class FakeSTT:
+    def __init__(self, texts):
+        self._t = list(texts)
+
+    def transcribe(self, audio):
+        return self._t.pop(0) if self._t else ""
+
+
+class FakeHermes:
+    def __init__(self):
+        self.calls = []
+
+    def send(self, text, session_key):
+        self.calls.append((text, session_key))
+        return f"reply to {text}"
+
+
+class FakeTTS:
+    sample_rate = 16000
+
+    def synthesize(self, text):
+        return b"\x00\x00"
+
+
+class RecordingSink:
+    def __init__(self):
+        self.plays = 0
+
+    def play(self, pcm, sample_rate=None):
+        self.plays += 1
+
+
+class SpyEarcons:
+    def __init__(self):
+        self.played = []
+
+    def play(self, cue):
+        self.played.append(cue)
+
+
+def _pipeline(wake, source, texts, conversation=None, flushes=None):
+    sm = StateMachine(initial=State.IDLE)
+    earcons = SpyEarcons()
+    sink = RecordingSink()
+    hermes = FakeHermes()
+    return Pipeline(
+        state_machine=sm,
+        wakeword=FakeWake(wake),
+        audio_source=source,
+        stt=FakeSTT(texts),
+        hermes=hermes,
+        tts=FakeTTS(),
+        audio_sink=sink,
+        session_key="dev-key",
+        is_muted=lambda: False,
+        earcons=earcons,
+        conversation=conversation or ConversationConfig(),
+        mic_flush=((lambda: flushes.append(1)) if flushes is not None else None),
+    ), sm, earcons, sink, hermes
+
+
+def test_single_turn_no_followup():
+    source = FakeSource([b"audio"])
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True], source, ["what time is it"]
+    )
+    pipe.run_cycle()
+    assert hermes.calls == [("what time is it", "dev-key")]
+    assert sink.plays == 1
+    assert earcons.played == ["wake"]        # chime on wake, none after
+    assert source.onsets == [None]           # first turn uses default timeout
+    assert sm.state is State.IDLE
+
+
+def test_wake_but_no_speech_resets():
+    pipe, sm, earcons, sink, hermes = _pipeline([True], FakeSource([b""]), [])
+    pipe.run_cycle()
+    assert hermes.calls == []
+    assert earcons.played == ["wake"]        # still chimes — it did wake
+    assert sm.state is State.IDLE
+
+
+def test_followup_continues_then_ends_on_silence():
+    source = FakeSource([b"one", b"two", b""])   # 3rd capture: no speech
+    flushes = []
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True], source, ["one", "two"],
+        conversation=ConversationConfig(follow_up=True, follow_up_seconds=6.0),
+        flushes=flushes,
+    )
+    pipe.run_cycle()
+    assert [c[0] for c in hermes.calls] == ["one", "two"]
+    assert sink.plays == 2
+    # default onset first, follow-up window on the next two capture attempts
+    assert source.onsets == [None, 6.0, 6.0]
+    # wake chime once, listening chime before each follow-up capture
+    assert earcons.played == ["wake", "listening", "listening"]
+    # mic flushed after wake and before each follow-up capture
+    assert len(flushes) == 3
+    assert sm.state is State.IDLE
+
+
+def test_followup_respects_max_turns():
+    # Speech every time; the cap must stop it (no spurious trailing chime).
+    source = FakeSource([b"a", b"b", b"c", b"d"])
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True], source, ["a", "b", "c", "d"],
+        conversation=ConversationConfig(follow_up=True, max_turns=2),
+    )
+    pipe.run_cycle()
+    assert len(hermes.calls) == 2
+    assert earcons.played == ["wake", "listening"]  # not a 2nd listening
+    assert sm.state is State.IDLE
+
+
+def test_error_plays_error_earcon():
+    class Boom:
+        def transcribe(self, audio):
+            raise RuntimeError("stt exploded")
+
+    sm = StateMachine(initial=State.IDLE)
+    earcons = SpyEarcons()
+    wake = FakeWake([True])
+    pipe = Pipeline(
+        state_machine=sm, wakeword=wake,
+        audio_source=FakeSource([b"audio"]), stt=Boom(),
+        hermes=FakeHermes(), tts=FakeTTS(), audio_sink=RecordingSink(),
+        session_key="k", is_muted=lambda: False, earcons=earcons,
+    )
+    wake.on_exhausted = pipe.stop  # end run_forever after the error cycle
+    pipe.run_forever()
+    assert "error" in earcons.played
+    assert sm.state is State.IDLE
+
+
+# --- streaming replies ----------------------------------------------------
+
+class StreamingHermes(FakeHermes):
+    def __init__(self, deltas, fail_after=None):
+        super().__init__()
+        self._deltas = deltas
+        self._fail_after = fail_after
+        self.stream_calls = 0
+
+    def send_stream(self, text, session_key):
+        self.stream_calls += 1
+        self.calls.append((text, session_key))
+
+        def gen():
+            for i, d in enumerate(self._deltas):
+                if self._fail_after is not None and i >= self._fail_after:
+                    raise RuntimeError("stream broke")
+                yield d
+        return gen()
+
+
+class CountingTTS(FakeTTS):
+    def __init__(self):
+        self.synthesized = []
+
+    def synthesize(self, text):
+        self.synthesized.append(text)
+        return b"\x00\x00"
+
+
+def _streaming_pipeline(hermes, tts=None):
+    sm = StateMachine(initial=State.IDLE)
+    sink = RecordingSink()
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True]),
+        audio_source=FakeSource([b"audio"]), stt=FakeSTT(["question"]),
+        hermes=hermes, tts=tts or CountingTTS(), audio_sink=sink,
+        session_key="k", is_muted=lambda: False, earcons=SpyEarcons(),
+        stream_replies=True,
+    )
+    return pipe, sm, sink
+
+
+def test_streaming_speaks_sentence_by_sentence():
+    hermes = StreamingHermes(
+        ["It is currently 2.47 PM Pacific Time. ",
+         "Tomorrow looks sunny and pleasant all day."])
+    tts = CountingTTS()
+    pipe, sm, sink = _streaming_pipeline(hermes, tts)
+    pipe.run_cycle()
+    assert hermes.stream_calls == 1
+    assert len(tts.synthesized) == 2          # one synth per sentence
+    assert sink.plays == 2
+    assert sm.state is State.IDLE
+
+
+def test_streaming_setup_failure_falls_back_to_blocking():
+    class NoStream(FakeHermes):
+        def send_stream(self, text, session_key):
+            raise RuntimeError("SSE not supported")
+
+    hermes = NoStream()
+    pipe, sm, sink = _streaming_pipeline(hermes)
+    pipe.run_cycle()
+    assert hermes.calls  # blocking send() was used
+    assert sink.plays == 1
+    assert sm.state is State.IDLE
+
+
+def test_streaming_midway_failure_errors_after_partial_speech():
+    hermes = StreamingHermes(
+        ["First sentence spoken fully and completely. ",
+         "Second sentence never finishes"], fail_after=1)
+    tts = CountingTTS()
+    pipe, sm, sink = _streaming_pipeline(hermes, tts)
+    pipe.run_forever_once = None
+    import pytest as _p
+    with _p.raises(RuntimeError, match="stream broke"):
+        pipe.run_cycle()
+    assert sink.plays >= 1  # partial reply was heard
+
+
+def test_stream_disabled_uses_blocking_even_if_supported():
+    hermes = StreamingHermes(["Whole reply in one go, spoken at once."])
+    sm = StateMachine(initial=State.IDLE)
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True]),
+        audio_source=FakeSource([b"audio"]), stt=FakeSTT(["q"]),
+        hermes=hermes, tts=CountingTTS(), audio_sink=RecordingSink(),
+        session_key="k", is_muted=lambda: False,
+        stream_replies=False,
+    )
+    pipe.run_cycle()
+    assert hermes.stream_calls == 0
+    assert hermes.calls  # blocking path

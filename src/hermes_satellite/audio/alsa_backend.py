@@ -52,21 +52,27 @@ class AlsaAudioSource(AudioSource):
             )
         return self._vad
 
-    def capture_utterance(self, is_muted: Callable[[], bool]) -> bytes:
+    def capture_utterance(
+        self, is_muted: Callable[[], bool], onset_timeout=None
+    ) -> bytes:
         cfg = self._config
         vad = self._get_vad()
         samples_per_frame = cfg.sample_rate * FRAME_MS // 1000
         self._mic.start()
+        onset = (
+            onset_timeout if onset_timeout is not None
+            else cfg.speech_timeout_seconds
+        )
 
         # Phase 1: wait for speech onset (keeping a pre-roll).
         pre_roll: deque = deque(maxlen=max(1, PRE_ROLL_MS // FRAME_MS))
-        deadline = time.monotonic() + cfg.speech_timeout_seconds
+        deadline = time.monotonic() + onset
         frame = b""
         while True:
             if is_muted():
                 return b""
             if time.monotonic() >= deadline:
-                logger.info("no speech within %.1fs", cfg.speech_timeout_seconds)
+                logger.info("no speech within %.1fs", onset)
                 return b""
             frame = self._mic.read(samples_per_frame)
             if vad.is_speech(frame):

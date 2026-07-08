@@ -82,6 +82,10 @@ class HermesConfig:
     # Sent as a system message before each utterance. Set to "" to disable
     # (e.g. if the persona/style is managed on the Hermes side).
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    # Stream the reply (SSE) and speak it sentence-by-sentence as it arrives —
+    # first audio in a few seconds instead of after the whole reply. Falls
+    # back to non-streaming automatically if the stream can't start.
+    stream: bool = True
 
 
 @dataclass
@@ -141,6 +145,26 @@ class MqttConfig:
 
 
 @dataclass
+class EarconsConfig:
+    # Short generated audio cues at pipeline events (wake chime, error tone)
+    # so you don't need to see the LEDs. No bundled assets — tones are
+    # synthesized at runtime.
+    enabled: bool = True
+    volume: float = 0.5  # 0-1, relative to full scale
+
+
+@dataclass
+class ConversationConfig:
+    # Follow-up mode: after a reply, listen again briefly so you can continue
+    # ("what about tomorrow?") without repeating the wake word.
+    follow_up: bool = False
+    # Seconds to wait for follow-up speech to begin before returning to idle.
+    follow_up_seconds: float = 6.0
+    # Safety cap on consecutive follow-up turns from a single wake.
+    max_turns: int = 8
+
+
+@dataclass
 class LEDConfig:
     backend: str = "apa102"
     brightness: int = 8
@@ -159,6 +183,8 @@ class Config:
     stt: STTConfig = field(default_factory=STTConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     leds: LEDConfig = field(default_factory=LEDConfig)
+    earcons: EarconsConfig = field(default_factory=EarconsConfig)
+    conversation: ConversationConfig = field(default_factory=ConversationConfig)
     mqtt: MqttConfig = field(default_factory=MqttConfig)
     # Writable data directory (models, caches, runtime setting overrides).
     data_dir: str = "/var/lib/hermes-satellite"
@@ -216,6 +242,10 @@ def _build(data: dict, profile_override: Optional[str] = None,
     stt = STTConfig(**_filter(_section(data, "stt"), STTConfig))
     tts = TTSConfig(**_filter(_section(data, "tts"), TTSConfig))
     leds = LEDConfig(**_filter(_section(data, "leds"), LEDConfig))
+    earcons = EarconsConfig(**_filter(_section(data, "earcons"), EarconsConfig))
+    conversation = ConversationConfig(
+        **_filter(_section(data, "conversation"), ConversationConfig)
+    )
     mqtt = MqttConfig(**_filter(_section(data, "mqtt"), MqttConfig))
     if mqtt.enabled and not mqtt.host:
         raise ConfigError("mqtt.enabled requires mqtt.host")
@@ -247,6 +277,8 @@ def _build(data: dict, profile_override: Optional[str] = None,
         stt=stt,
         tts=tts,
         leds=leds,
+        earcons=earcons,
+        conversation=conversation,
         mqtt=mqtt,
         data_dir=str(data.get("data_dir", "/var/lib/hermes-satellite")),
         log_level=log_level,

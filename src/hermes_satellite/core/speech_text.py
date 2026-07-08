@@ -67,3 +67,41 @@ def make_speakable(text: str) -> str:
     text = _EMOJI.sub("", text)
 
     return _WHITESPACE.sub(" ", text).strip()
+
+
+# --- streaming sentence chunker ---------------------------------------------
+
+# A boundary is .!? followed by whitespace — but not inside a decimal number
+# ("2.47 PM") and not after a single capital initial ("J. Smith").
+_BOUNDARY = re.compile(r"(?<!\d)(?<![A-Z])[.!?]+(?=\s)")
+
+# Sentences shorter than this merge forward so TTS doesn't sound choppy.
+MIN_CHUNK_CHARS = 20
+
+
+def iter_sentences(deltas):
+    """Group a stream of text deltas into speakable sentence chunks.
+
+    Yields complete sentences as soon as their boundary arrives, merging
+    fragments shorter than :data:`MIN_CHUNK_CHARS` into the next chunk.
+    Whatever remains when the stream ends is yielded last.
+    """
+    buffer = ""
+    pending = ""  # short fragment held back to merge forward
+    for delta in deltas:
+        buffer += delta
+        while True:
+            match = _BOUNDARY.search(buffer)
+            if not match:
+                break
+            sentence = buffer[: match.end()]
+            buffer = buffer[match.end():].lstrip()
+            candidate = (pending + " " + sentence).strip() if pending else sentence.strip()
+            if len(candidate) < MIN_CHUNK_CHARS:
+                pending = candidate
+                continue
+            pending = ""
+            yield candidate
+    tail = (pending + " " + buffer).strip() if pending else buffer.strip()
+    if tail:
+        yield tail

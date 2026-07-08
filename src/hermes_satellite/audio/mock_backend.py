@@ -17,8 +17,12 @@ class MockAudioSource(AudioSource):
         self._config = config
         self._seconds = capture_seconds
 
-    def capture_utterance(self, is_muted: Callable[[], bool]) -> bytes:
+    def capture_utterance(self, is_muted: Callable[[], bool], onset_timeout=None) -> bytes:
         if is_muted():
+            return b""
+        if onset_timeout is not None:
+            # Follow-up window in demo: pretend the conversation ended.
+            logger.info("mock follow-up: no further speech")
             return b""
         logger.info("mock capture: %.1fs of silence", self._seconds)
         time.sleep(self._seconds)
