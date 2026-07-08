@@ -54,14 +54,24 @@ Defaults: `host: 127.0.0.1`, `port: 8642` (from `hermes:` in config).
 | `X-Hermes-Session-Key`  | `<session_key>`               | **Per‑device memory scoping** on Hermes  |
 | `Content-Type`          | `application/json`            |                                          |
 
-The session key lets each satellite device have its own conversational memory on
-the Hermes side. `HermesClient.send(text, session_key)` uses the per‑call
-`session_key`, falling back to `hermes.session_key` from config when empty.
+The session key lets each satellite device have its own **long‑term memory
+scope** on the Hermes side. `HermesClient.send(text, session_key)` uses the
+per‑call `session_key`, falling back to `hermes.session_key` from config when
+empty.
 
-> **Open contract question:** the Hermes server's own API docs don't mention
-> `X-Hermes-Session-Key`. Unknown headers are harmless, but if your Hermes
-> build doesn't implement session scoping, all satellites share one memory —
-> verify by asking the agent something device-specific from two session keys.
+> **Verified** against the [Hermes API Server
+> docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server/)
+> (2026‑07‑08): `X-Hermes-Session-Key` is "a stable per‑channel identifier for
+> long‑term memory," threaded to `AIAgent(gateway_session_key=...)`; the Honcho
+> memory provider derives a stable scope from it. It is intentionally distinct
+> from the transcript‑scoped `X-Hermes-Session-Id` (which rotates on `/new`),
+> so a device keeps its memory across conversation resets. Give each satellite
+> a distinct key (the hostname is a good default) for per‑device memory;
+> reuse one key across devices to share memory.
+>
+> **Constraints:** max 256 characters; control characters (`\r`, `\n`, `\x00`)
+> are rejected by the server. The client validates this before sending so a
+> bad key fails clearly rather than as an opaque HTTP error.
 
 Provide secrets via env vars to keep them out of `config.yaml`:
 

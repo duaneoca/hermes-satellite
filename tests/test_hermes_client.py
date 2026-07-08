@@ -96,3 +96,12 @@ def test_no_api_key_omits_authorization_header():
         assert "Authorization" not in responses.calls[0].request.headers
 
     run()
+
+
+def test_session_key_too_long_or_control_chars_rejected():
+    client = HermesClient(_config())
+    import pytest as _pytest
+    with _pytest.raises(HermesError, match="session key"):
+        client.send("hi", session_key="x" * 257)
+    with _pytest.raises(HermesError, match="control"):
+        client.send("hi", session_key="bad\nkey")

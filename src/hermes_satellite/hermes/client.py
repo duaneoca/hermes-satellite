@@ -33,6 +33,13 @@ class HermesClient(AgentClient):
         # Per-device memory scoping. Fall back to the configured session key.
         key = session_key or self._cfg.session_key
         if key:
+            # Hermes rejects control chars and keys > 256 chars; fail here
+            # with a clear message rather than as an opaque server error.
+            if len(key) > 256 or any(c in key for c in "\r\n\x00"):
+                raise HermesError(
+                    "session key must be <=256 chars and contain no control "
+                    f"characters (got {len(key)} chars)"
+                )
             headers["X-Hermes-Session-Key"] = key
         return headers
 
