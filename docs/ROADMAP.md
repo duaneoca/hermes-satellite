@@ -17,16 +17,35 @@ misleading level metrics), not the config file itself.
 - Earcons (wake chime / error tone) — audio feedback so users aren't
   dependent on seeing the LEDs.
 
-## V2 — integration & conversation
+## V2 — configuration & integration (architecture agreed 2026-07-07)
 
-- **Home Assistant via MQTT discovery** (satellite stays outbound-only — no
-  listening ports, preserving the IoT-VLAN posture; see docs/networking.md):
-  - `switch`: mute (mirrors the HAT button)
-  - `number`: wake threshold, speaker volume
-  - `sensor`: pipeline state (idle/listening/thinking/speaking)
-  - `event`/trigger: wake word detected — enables automations like "pause
-    media when addressed"
-  - availability topic → HA shows the satellite online/offline
+Configuration splits into two tiers with different solutions:
+
+**0. Runtime settings layer (enabler for both tiers).** Config stays
+read-only for the service; runtime-tweakable knobs (mute, volume, wake
+threshold, voice, length_scale, LED brightness) get a thread-safe get/set
+registry with apply semantics (live / component-reload / needs-restart) and
+persist to an overlay `/var/lib/hermes-satellite/runtime.yaml` merged over
+config.yaml at load — the sandboxed service writes only its own data dir.
+
+**1. Daily knobs → Home Assistant via MQTT discovery** (outbound-only — no
+listening ports, preserving the IoT-VLAN posture; see docs/networking.md):
+
+- `switch`: mute (mirrors the HAT button, both directions)
+- `number`: speaker volume, wake threshold, TTS length_scale, LED brightness
+- `select`: TTS voice (populated from downloaded voices)
+- `sensor`: pipeline state (idle/listening/thinking/speaking); availability
+  topic → online/offline
+- `event`/trigger: wake word detected — enables "pause media when addressed"
+
+**2. Setup → on-demand web wizard, not a web service.**
+`hermes-satellite setup --web` starts a temporary token-protected server,
+walks device selection → mixer calibration with a live level meter → voice
+audition → wake threshold tuning with live scores → Hermes connection test,
+writes config.yaml, and **exits**. Steady-state listening ports remain zero.
+Reuses the proven guts: --ww-monitor, voices preview, wm8960-mixer.sh.
+
+**Also V2:**
 - Follow-up conversation mode (re-open capture for N seconds after a reply,
   no wake word needed).
 - SSE streaming from Hermes + sentence-chunked Piper synthesis (cut
@@ -34,9 +53,5 @@ misleading level metrics), not the config file itself.
 
 ## V2+ — maybe
 
-- Local web GUI for configuration. Tension: it adds a listening port to an
-  always-on microphone device, which the current design deliberately avoids.
-  Only if the setup wizard + HA integration prove insufficient; opt-in,
-  LAN-bound, authenticated.
 - Barge-in (wake word interrupts playback).
 - Multi-satellite conventions (per-device session keys already exist).
