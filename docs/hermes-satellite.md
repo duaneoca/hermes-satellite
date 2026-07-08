@@ -150,16 +150,17 @@ guidance, Wi-Fi (WPA3) caveats, and fully-offline install instructions.
 
 ## Running as a service
 
-The deployed daemon runs as a dedicated **`hermes` system user** whose entire
+The deployed daemon runs as a dedicated **`hermes-sat` system user** (named
+to avoid confusion with the Hermes *server*) whose entire
 privilege is "may touch sound, SPI and GPIO." Ownership principle: *the
 service can write only its own data directory.*
 
 | Path | Owner / mode | Service access | Holds |
 | ---- | ------------ | -------------- | ----- |
 | `/opt/hermes-satellite` | root | read-only | code + venv |
-| `/etc/hermes-satellite/config.yaml` | root:hermes 640 | read-only | configuration |
+| `/etc/hermes-satellite/config.yaml` | root:hermes-sat 640 | read-only | configuration |
 | `/etc/hermes-satellite/secrets.env` | root:root 600 | none (systemd reads it) | API keys |
-| `/var/lib/hermes-satellite` | hermes:hermes | **read-write** | models, caches, lgpio pipes |
+| `/var/lib/hermes-satellite` | hermes-sat:hermes-sat | **read-write** | models, caches, lgpio pipes |
 
 The unit also enables systemd sandboxing (`ProtectSystem=strict`,
 `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) — appropriate hygiene for an
@@ -175,7 +176,7 @@ stays your user's and is unrelated to the deployed copy.
    > `UV_PYTHON_INSTALL_DIR` puts the interpreter inside `/opt` instead.
 
    ```bash
-   sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes
+   sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes-sat
    sudo git clone https://github.com/duaneoca/hermes-satellite /opt/hermes-satellite
    sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" python install 3.11
    sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" venv --seed --python 3.11 /opt/hermes-satellite/.venv
@@ -190,7 +191,7 @@ stays your user's and is unrelated to the deployed copy.
    ```bash
    sudo mkdir -p /etc/hermes-satellite
    sudo cp config.yaml /etc/hermes-satellite/config.yaml       # your tuned config
-   sudo chown root:hermes /etc/hermes-satellite/config.yaml
+   sudo chown root:hermes-sat /etc/hermes-satellite/config.yaml
    sudo chmod 640 /etc/hermes-satellite/config.yaml
    sudo tee /etc/hermes-satellite/secrets.env >/dev/null <<'EOF'
    HERMES_API_KEY=...
@@ -204,7 +205,7 @@ stays your user's and is unrelated to the deployed copy.
    sudo mkdir -p /var/lib/hermes-satellite/cache
    # Piper voice etc. should already live here per the setup docs; then:
    sudo cp -r ~/.cache/moonshine_voice /var/lib/hermes-satellite/cache/
-   sudo chown -R hermes:hermes /var/lib/hermes-satellite
+   sudo chown -R hermes-sat:hermes-sat /var/lib/hermes-satellite
    ```
 4. Install and start the unit:
    ```bash

@@ -9,9 +9,9 @@ Type=simple
 # Dedicated unprivileged user; must be in the spi, audio and gpio groups so it
 # can drive the APA102 LEDs (SPI), the microphone/speaker (ALSA) and the HAT
 # button (GPIO). Create with:
-#   sudo useradd -r -G spi,audio,gpio hermes
-User=hermes
-Group=hermes
+#   sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes-sat
+User=hermes-sat
+Group=hermes-sat
 SupplementaryGroups=spi audio gpio
 
 # Adjust paths to your install. The venv is created at /opt/hermes-satellite.
@@ -33,7 +33,7 @@ EnvironmentFile=-/etc/hermes-satellite/secrets.env
 # The service user has no home directory, so point XDG caches (Moonshine's
 # ~80 MB STT model lives in $XDG_CACHE_HOME/moonshine_voice) at the app's
 # data directory. Pre-seed it to avoid a download at first service start:
-#   sudo -u hermes XDG_CACHE_HOME=/var/lib/hermes-satellite/cache \
+#   sudo -u hermes-sat XDG_CACHE_HOME=/var/lib/hermes-satellite/cache \
 #     /opt/hermes-satellite/.venv/bin/python -c \
 #     "import moonshine_voice as mv; mv.get_model_for_language('en', mv.ModelArch.BASE)"
 Environment=XDG_CACHE_HOME=/var/lib/hermes-satellite/cache
