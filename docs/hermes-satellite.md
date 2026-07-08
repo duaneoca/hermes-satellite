@@ -166,16 +166,26 @@ The unit also enables systemd sandboxing (`ProtectSystem=strict`,
 always-listening device. Your development clone (e.g. `~/git/hermes-satellite`)
 stays your user's and is unrelated to the deployed copy.
 
-1. Create the service user, then install to `/opt` (root-owned, venv from the
-   same Python that worked interactively — on Trixie that's the uv 3.11):
+1. Create the service user, then install to `/opt` (root-owned, venv from
+   the same Python that worked interactively — on Trixie that's uv's 3.11).
+
+   > **Trixie/uv gotcha:** uv normally installs its Pythons under *your*
+   > home directory, but the unit sets `ProtectHome=true` — the service
+   > would be unable to read its own interpreter and fail at startup.
+   > `UV_PYTHON_INSTALL_DIR` puts the interpreter inside `/opt` instead.
+
    ```bash
    sudo useradd -r -s /usr/sbin/nologin -G spi,audio,gpio hermes
-   sudo mkdir -p /opt/hermes-satellite
    sudo git clone https://github.com/duaneoca/hermes-satellite /opt/hermes-satellite
-   sudo uv venv --seed --python 3.11 /opt/hermes-satellite/.venv
+   sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" python install 3.11
+   sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" venv --seed --python 3.11 /opt/hermes-satellite/.venv
    sudo /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
    sudo /opt/hermes-satellite/.venv/bin/pip install -e "/opt/hermes-satellite[pi4]"  # or [pi5]
+   # sanity: the interpreter must NOT live under /home
+   readlink -f /opt/hermes-satellite/.venv/bin/python   # expect /opt/hermes-satellite/python/...
    ```
+   (On Bookworm, plain `python3 -m venv` with the system 3.11 avoids all of
+   this.)
 2. Config and secrets (admin-owned, service-readable where needed):
    ```bash
    sudo mkdir -p /etc/hermes-satellite
