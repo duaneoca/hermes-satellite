@@ -24,9 +24,12 @@ button toggles microphone mute.
    - **[Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 →](docs/hardware/pi5-respeaker-v2.md)**
 3. **Run the setup wizard** for everything audio — mic calibration with a
    live meter, wake-word tuning, voice audition, Hermes connection test:
-   `hermes-satellite setup` ([guide](docs/setup-wizard.md))
+   `hermes-satellite setup` ([guide](docs/setup-wizard.md)).
+   Steps 1–3 all run as your normal login user against your clone.
 4. **Install it as a service** so it survives reboots:
-   [Running as a service](docs/hermes-satellite.md#running-as-a-service)
+   [Running as a service](docs/hermes-satellite.md#running-as-a-service).
+   This is where the dedicated `hermes-sat` service user is created and your
+   tuned config moves to its system locations (`/opt`, `/etc`, `/var/lib`).
 
 On an IoT VLAN or segmented network? Read [networking.md](docs/networking.md)
 first — the satellite needs no inbound ports and exactly one steady-state
