@@ -100,7 +100,19 @@ class OpenWakeWord(WakeWordDetector):
                     if not os.path.exists(self._config.model_path)
                     else []
                 )
-                openwakeword.utils.download_models(model_names=names)
+                try:
+                    openwakeword.utils.download_models(model_names=names)
+                except OSError as exc:
+                    # Sandboxed service: site-packages is read-only. The
+                    # models must be pre-seeded by root at install time.
+                    raise RuntimeError(
+                        "openWakeWord model files are missing and the "
+                        f"package directory is not writable ({exc}). "
+                        "Pre-seed them as root:  sudo <venv>/bin/python -c "
+                        "\"import openwakeword.utils; openwakeword.utils."
+                        f"download_models(['{self._config.model_path}'])\"  "
+                        "— see 'Running as a service' in docs."
+                    ) from exc
                 self._handle = self._create_model()
             logger.info(
                 "openwakeword ready: %s (threshold %.2f, patience %d, "

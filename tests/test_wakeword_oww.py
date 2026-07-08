@@ -237,3 +237,22 @@ def test_on_audio_hook_receives_frames_not_while_muted(fake_oww):
     # 2 muted frames skipped, 2 processed frames delivered to the hook
     assert len(frames) == 2
     assert all(len(f) == FRAME_SAMPLES * 2 for f in frames)
+
+
+def test_download_failure_on_readonly_fs_gives_preseed_hint(fake_oww, monkeypatch):
+    import sys
+    orig = sys.modules["openwakeword.model"].Model
+
+    class AlwaysMissing(orig):
+        def __init__(self, **kwargs):
+            raise FileNotFoundError("model file missing")
+
+    sys.modules["openwakeword.model"].Model = AlwaysMissing
+
+    def denied(model_names=None):
+        raise OSError(30, "Read-only file system")
+
+    sys.modules["openwakeword.utils"].download_models = denied
+    ww = OpenWakeWord(_config(), mic=FakeMic())
+    with pytest.raises(RuntimeError, match="Pre-seed"):
+        ww.wait_for_wake(lambda: False)

@@ -189,6 +189,10 @@ stays your user's and is unrelated to the deployed copy.
    sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" venv --seed --python 3.11 /opt/hermes-satellite/.venv
    sudo /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
    sudo /opt/hermes-satellite/.venv/bin/pip install -e "/opt/hermes-satellite[pi4]"  # or [pi5]
+   # Pre-seed the openWakeWord model files INTO THIS venv — the wizard only
+   # downloaded them into your interactive clone's venv, and the sandboxed
+   # service cannot write to /opt to fetch them itself:
+   sudo /opt/hermes-satellite/.venv/bin/python -c "import openwakeword.utils; openwakeword.utils.download_models(['hey_jarvis'])"
    # sanity: the interpreter must NOT live under /home
    readlink -f /opt/hermes-satellite/.venv/bin/python   # expect /opt/hermes-satellite/python/...
    ```
