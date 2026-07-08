@@ -69,6 +69,16 @@ class OpenWakeWord(WakeWordDetector):
         self.on_audio: Optional[Callable[[bytes], None]] = None
 
     def _create_model(self):
+        # Quiet onnxruntime's own stderr logger (it bypasses our log_level):
+        # on a Pi its GPU probe reads PCI-only sysfs attrs that the VC4
+        # display devices don't have, warning noisily before falling back to
+        # CPU — which is the only provider we use anyway.
+        try:
+            import onnxruntime
+
+            onnxruntime.set_default_logger_severity(3)  # ERROR and up only
+        except Exception:
+            pass
         from openwakeword.model import Model
 
         cfg = self._config
