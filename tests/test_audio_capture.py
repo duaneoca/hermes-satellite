@@ -65,8 +65,28 @@ def test_capture_hard_cap(monkeypatch):
     # Speech never ends; the max_record_seconds cap must stop the loop.
     src, mic = _source([False, True], max_record_seconds=0.0)
     audio = src.capture_utterance(lambda: False)
-    # onset frame only: phase 2 loop exits immediately at the cap.
-    assert len(audio) == 2 * len(FRAME)  # 1 pre-roll + onset frame
+    # phase 2 exits immediately at the cap; the onset frames survive via
+    # the pre-roll: 1 silent + 3 speech (onset debounce)
+    assert len(audio) == 4 * len(FRAME)
+
+
+def test_single_frame_click_does_not_trigger_onset():
+    """Regression: the WM8960's output-stage pop reads as one loud 'speech'
+    frame to webrtcvad, which used to open recording instantly — follow-up
+    windows ended after ~silence_ms instead of staying open."""
+    src, _ = _source([False, True, False], speech_timeout_seconds=0.2)
+    assert src.capture_utterance(lambda: False) == b""
+
+
+def test_two_frame_click_does_not_trigger_onset():
+    src, _ = _source([False, True, True, False], speech_timeout_seconds=0.2)
+    assert src.capture_utterance(lambda: False) == b""
+
+
+def test_followup_onset_timeout_overrides_default():
+    # onset_timeout=0 must beat a long speech_timeout_seconds
+    src, _ = _source([False], speech_timeout_seconds=60.0)
+    assert src.capture_utterance(lambda: False, onset_timeout=0.0) == b""
 
 
 def test_mute_mid_capture_stops_recording():

@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 FRAME_MS = 30
 # Audio kept from just before speech onset so the first syllable isn't lost.
 PRE_ROLL_MS = 300
+# Consecutive speech frames required before recording starts. A single loud
+# frame is not speech: the WM8960's output-stage pop (~15 ms, full scale) and
+# similar clicks read as one "speech" frame to webrtcvad, which used to open
+# recording instantly and burn the whole follow-up window on silence.
+ONSET_FRAMES = 3  # 90 ms
 
 
 class AlsaAudioSource(AudioSource):
@@ -64,10 +69,14 @@ class AlsaAudioSource(AudioSource):
             else cfg.speech_timeout_seconds
         )
 
-        # Phase 1: wait for speech onset (keeping a pre-roll).
+        # Phase 1: wait for speech onset (keeping a pre-roll). Onset means
+        # ONSET_FRAMES consecutive speech frames — the frames leading up to
+        # it stay in the pre-roll, so nothing is clipped.
         pre_roll: deque = deque(maxlen=max(1, PRE_ROLL_MS // FRAME_MS))
-        deadline = time.monotonic() + onset
+        started = time.monotonic()
+        deadline = started + onset
         frame = b""
+        consecutive = 0
         while True:
             if is_muted():
                 return b""
@@ -76,8 +85,15 @@ class AlsaAudioSource(AudioSource):
                 return b""
             frame = self._mic.read(samples_per_frame)
             if vad.is_speech(frame):
-                break
+                consecutive += 1
+                if consecutive >= ONSET_FRAMES:
+                    break
+            else:
+                consecutive = 0
             pre_roll.append(frame)
+        logger.debug(
+            "speech onset after %.2fs", time.monotonic() - started
+        )
 
         # Phase 2: record until trailing silence or the hard cap.
         voiced = list(pre_roll)

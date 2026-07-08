@@ -122,8 +122,12 @@ between pipeline stages would drop the start of speech. The stream delivers
 Capture (`audio/alsa_backend.py`) is VAD-gated by webrtcvad in 30 ms frames:
 wait up to `speech_timeout_seconds` for onset (keeping a 300 ms pre-roll so the
 first syllable isn't clipped), then record until `silence_ms` of trailing
-silence or `max_record_seconds`. While muted, capture returns empty and the
-wake loop drains frames without processing them.
+silence or `max_record_seconds`. Onset requires **90 ms of consecutive speech**
+— a single loud frame is ignored, because the WM8960's output-stage pop
+(~15 ms, full scale) otherwise reads as speech and opens recording on silence
+(the symptom: a follow-up window that closes after ~1 s instead of staying
+open). While muted, capture returns empty and the wake loop drains frames
+without processing them.
 
 Playback opens the output stream at the TTS engine's native rate
 (`TTSEngine.sample_rate` — e.g. a Piper voice's 22050 Hz), so no resampling is
