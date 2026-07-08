@@ -12,6 +12,26 @@ A single state machine (`IDLE → WAKE → RECORD → PROCESS → SPEAK → IDLE
 the pipeline, and the HAT's 3 APA102 LEDs reflect the current state. The HAT
 button toggles microphone mute.
 
+## 🛰 Setting up a satellite? Start here
+
+1. **Flash Raspberry Pi OS** (64-bit; Trixie works — the guides say what to
+   do about its Python). Pick a good hostname: it becomes the device's name
+   in Home Assistant and its memory scope on Hermes (room-based names like
+   `jarvis-kitchen` age well).
+2. **Follow your board's guide, top to bottom** — it covers the audio codec,
+   SPI, groups, and install order:
+   - **[Raspberry Pi 4 + ReSpeaker 2-Mic HAT v1 →](docs/hardware/pi4-respeaker-v1.md)**
+   - **[Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 →](docs/hardware/pi5-respeaker-v2.md)**
+3. **Run the setup wizard** for everything audio — mic calibration with a
+   live meter, wake-word tuning, voice audition, Hermes connection test:
+   `hermes-satellite setup` ([guide](docs/setup-wizard.md))
+4. **Install it as a service** so it survives reboots:
+   [Running as a service](docs/hermes-satellite.md#running-as-a-service)
+
+On an IoT VLAN or segmented network? Read [networking.md](docs/networking.md)
+first — the satellite needs no inbound ports and exactly one steady-state
+outbound flow.
+
 ## Status
 
 All components are implemented:
@@ -32,7 +52,7 @@ All components are implemented:
 Every backend has a mock counterpart, so the whole daemon runs via `--demo` on
 any machine. On‑device validation (real mic/speaker/LEDs) still needs the Pi.
 
-## Quick start (development, no hardware)
+## Quick start for development (no hardware)
 
 ```bash
 git clone https://github.com/duaneoca/hermes-satellite.git
@@ -45,11 +65,6 @@ pytest
 cp config.example.yaml config.yaml   # edit as needed
 hermes-satellite --demo --hardware-profile mock --config config.example.yaml
 ```
-
-Deploying to a Pi? Follow your board's guide instead:
-[Pi 4 + HAT v1](docs/hardware/pi4-respeaker-v1.md) ·
-[Pi 5 + HAT v2](docs/hardware/pi5-respeaker-v2.md) — they cover the codec
-driver, SPI, groups, and install order.
 
 `--demo` uses mock wakeword/audio/STT/TTS/LEDs and a canned agent reply, walking
 the state machine through a full cycle. Press Enter to toggle mute.
