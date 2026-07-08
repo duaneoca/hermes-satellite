@@ -492,18 +492,35 @@ def _make_handler(state: WizardState):
             name = body.get("name") or state.config.tts.voice
             speaker = body.get("speaker_id")
             length_scale = body.get("length_scale")
-            tts_cfg = dataclasses.replace(
-                state.config.tts, voice=name, voice_path="",
-                speaker_id=int(speaker) if speaker not in (None, "") else None,
-                length_scale=float(length_scale)
-                if length_scale not in (None, "") else None,
-            )
-            tts = PiperTTS(tts_cfg, sample_rate=state.config.audio.sample_rate)
+            was_downloaded = (
+                Path(state.config.tts.voices_dir) / f"{name}.onnx"
+            ).exists()
+
+            # Cache loaded engines: reloading the onnx per click looks like a
+            # re-download on a Pi. Knobs live on the cached config object and
+            # are read at synthesis time, so they stay adjustable.
+            cached = state._tts_cache.get(name)
+            if cached is None:
+                tts_cfg = dataclasses.replace(
+                    state.config.tts, voice=name, voice_path="")
+                tts = PiperTTS(
+                    tts_cfg, sample_rate=state.config.audio.sample_rate)
+                state._tts_cache[name] = (tts_cfg, tts)
+            else:
+                tts_cfg, tts = cached
+            tts_cfg.speaker_id = (
+                int(speaker) if speaker not in (None, "") else None)
+            tts_cfg.length_scale = (
+                float(length_scale) if length_scale not in (None, "") else None)
+
+            started = time.monotonic()
             with _heavy_lock:
                 pcm = tts.synthesize(
-                body.get("text")
-                or "Good evening. All systems are operating within normal parameters."
-            )
+                    body.get("text")
+                    or "Good evening. All systems are operating "
+                       "within normal parameters."
+                )
+            elapsed = round(time.monotonic() - started, 1)
             _, sink = build_audio(state.config)
             sink.play(pcm, tts.sample_rate)
             # keep the audition as the pending choice
@@ -512,7 +529,9 @@ def _make_handler(state: WizardState):
                 state.set_pending("tts", "speaker_id", tts_cfg.speaker_id)
             if tts_cfg.length_scale is not None:
                 state.set_pending("tts", "length_scale", tts_cfg.length_scale)
-            self._json({"ok": True, "sample_rate": tts.sample_rate})
+            self._json({"ok": True, "sample_rate": tts.sample_rate,
+                        "downloaded": not was_downloaded,
+                        "elapsed": elapsed})
 
         def _hermes_test(self, body):
             import requests
