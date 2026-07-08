@@ -92,6 +92,23 @@ tts:
   # length_scale: 1.05
   # volume: 1.0
 
+# Home Assistant integration via MQTT discovery. Outbound-only: the
+# satellite connects OUT to your broker; no listening ports are opened.
+# HA auto-creates the device: mute switch, volume/threshold/pace/brightness
+# sliders, voice select, state sensor, wake-word event for automations.
+mqtt:
+  enabled: false
+  host: ""                 # your MQTT broker (often the HA host)
+  port: 1883
+  username: ""
+  password: ""             # or set MQTT_PASSWORD in the environment
+  # device_id: kitchen     # defaults to this Pi's hostname
+  # discovery_prefix: homeassistant
+
+# Writable data directory: models, caches, runtime setting overrides
+# (knobs changed from HA persist to {data_dir}/runtime.yaml).
+data_dir: /var/lib/hermes-satellite
+
 leds:
   backend: apa102          # apa102 | mock
   # Global brightness 0-31 for the APA102 LEDs.

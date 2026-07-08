@@ -47,13 +47,24 @@ class Mute:
         with self._lock:
             self._muted = not self._muted
             muted = self._muted
+        self._notify(muted)
+        return muted
+
+    def set(self, muted: bool) -> None:
+        """Set an absolute mute state (e.g. from MQTT); no-op if unchanged."""
+        with self._lock:
+            if self._muted == muted:
+                return
+            self._muted = muted
+        self._notify(muted)
+
+    def _notify(self, muted: bool) -> None:
         logger.info("microphone %s", "MUTED" if muted else "unmuted")
         for listener in list(self._listeners):
             try:
                 listener(muted)
             except Exception:  # pragma: no cover - listener isolation
                 logger.exception("mute listener failed")
-        return muted
 
 
 class Button:

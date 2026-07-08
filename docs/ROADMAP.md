@@ -21,14 +21,14 @@ misleading level metrics), not the config file itself.
 
 Configuration splits into two tiers with different solutions:
 
-**0. Runtime settings layer (enabler for both tiers).** Config stays
+**0. Runtime settings layer (enabler for both tiers).** — ✅ shipped 2026-07-07 Config stays
 read-only for the service; runtime-tweakable knobs (mute, volume, wake
 threshold, voice, length_scale, LED brightness) get a thread-safe get/set
 registry with apply semantics (live / component-reload / needs-restart) and
 persist to an overlay `/var/lib/hermes-satellite/runtime.yaml` merged over
 config.yaml at load — the sandboxed service writes only its own data dir.
 
-**1. Daily knobs → Home Assistant via MQTT discovery** (outbound-only — no
+**1. Daily knobs → Home Assistant via MQTT discovery** — ✅ shipped 2026-07-07 (outbound-only — no
 listening ports, preserving the IoT-VLAN posture; see docs/networking.md):
 
 - `switch`: mute (mirrors the HAT button, both directions)

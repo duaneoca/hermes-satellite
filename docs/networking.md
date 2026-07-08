@@ -10,6 +10,7 @@ outbound, and after initial setup it needs exactly one flow to function.
 | Flow | When | Purpose |
 | ---- | ---- | ------- |
 | TCP → Hermes host : 8642 | **steady state** | the agent API — the only day-to-day need |
+| TCP → MQTT broker : 1883 | steady state (optional) | Home Assistant integration — outbound-only ([home-assistant.md](home-assistant.md)) |
 | DNS, NTP | steady state | name resolution, sane timestamps |
 | HTTPS → github.com, pypi.org, files.pythonhosted.org | install / upgrade | git clone + pip |
 | HTTPS → github.com (release assets) | first run | openWakeWord pretrained model auto-download |

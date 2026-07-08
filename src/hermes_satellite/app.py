@@ -42,6 +42,18 @@ class SatelliteApp:
         self.demo = demo
         self._stopping = threading.Event()
 
+        # Runtime settings: apply the persisted overlay BEFORE components are
+        # built so knobs land in the config they read.
+        from pathlib import Path
+
+        from .core.settings import RuntimeSettings
+
+        self.settings = RuntimeSettings(
+            config, Path(config.data_dir) / "runtime.yaml"
+        )
+        self.settings.load()
+        self.settings.subscribe(self._on_setting_changed)
+
         # State + LEDs.
         self.sm = StateMachine(initial=State.IDLE)
         self.leds = build_led_controller(config, demo=demo)
@@ -70,6 +82,7 @@ class SatelliteApp:
         stt = build_stt(config, demo=demo)
         tts = build_tts(config, demo=demo)
         hermes = build_hermes(config, demo=demo)
+        self.tts = tts
 
         self.pipeline = Pipeline(
             state_machine=self.sm,
@@ -86,6 +99,14 @@ class SatelliteApp:
     @classmethod
     def from_config(cls, config: Config, demo: bool = False) -> "SatelliteApp":
         return cls(config, demo=demo)
+
+    # -- Settings glue ---------------------------------------------------------
+    def _on_setting_changed(self, key: str, value) -> None:
+        """Apply-hooks for knobs that need more than a config mutation."""
+        if key == "voice" and hasattr(self.tts, "reload"):
+            self.tts.reload()  # next utterance loads (and downloads) the voice
+        elif key == "led_brightness":
+            self.leds.set_brightness(int(value))
 
     # -- LED glue ------------------------------------------------------------
     def _on_transition(self, _old: State, new: State) -> None:
@@ -108,6 +129,19 @@ class SatelliteApp:
         self.leds.start()
         self.leds.set_state(LEDState.IDLE)
         self.button.start()
+        self.mqtt = None
+        if self.config.mqtt.enabled:
+            try:
+                from .integrations.mqtt import MqttBridge
+
+                self.mqtt = MqttBridge(self.config, self.settings, self.mute)
+                self.sm.subscribe(lambda _old, new: self.mqtt.publish_state(new))
+                self.mqtt.start()
+            except ImportError:
+                logger.error(
+                    "mqtt.enabled but paho-mqtt is not installed "
+                    "(pip install paho-mqtt); continuing without MQTT"
+                )
         try:
             self.pipeline.run_forever()
         finally:
@@ -120,6 +154,8 @@ class SatelliteApp:
         logger.info("shutting down")
         self.pipeline.stop()
         self.button.stop()
+        if getattr(self, "mqtt", None) is not None:
+            self.mqtt.stop()
         if self._mic is not None:
             self._mic.close()
         self.leds.stop()

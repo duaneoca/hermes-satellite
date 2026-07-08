@@ -20,6 +20,7 @@ from .platform import HardwareProfile, get_profile
 ENV_HERMES_API_KEY = "HERMES_API_KEY"
 ENV_HERMES_SESSION_KEY = "HERMES_SESSION_KEY"
 ENV_PORCUPINE_ACCESS_KEY = "PORCUPINE_ACCESS_KEY"
+ENV_MQTT_PASSWORD = "MQTT_PASSWORD"
 
 
 class ConfigError(Exception):
@@ -126,6 +127,20 @@ class TTSConfig:
 
 
 @dataclass
+class MqttConfig:
+    """Home Assistant integration via MQTT discovery (outbound-only)."""
+
+    enabled: bool = False
+    host: str = ""
+    port: int = 1883
+    username: str = ""
+    password: str = ""  # or set MQTT_PASSWORD in the environment
+    # Identifies this satellite in topics and in HA. Defaults to the hostname.
+    device_id: str = ""
+    discovery_prefix: str = "homeassistant"
+
+
+@dataclass
 class LEDConfig:
     backend: str = "apa102"
     brightness: int = 8
@@ -144,6 +159,9 @@ class Config:
     stt: STTConfig = field(default_factory=STTConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     leds: LEDConfig = field(default_factory=LEDConfig)
+    mqtt: MqttConfig = field(default_factory=MqttConfig)
+    # Writable data directory (models, caches, runtime setting overrides).
+    data_dir: str = "/var/lib/hermes-satellite"
     # Daemon log level (DEBUG|INFO|WARNING|ERROR). WARNING keeps a deployed
     # satellite near-silent in the journal; the --log-level CLI flag overrides.
     log_level: str = "INFO"
@@ -197,6 +215,14 @@ def _build(data: dict, profile_override: Optional[str] = None) -> Config:
     stt = STTConfig(**_filter(_section(data, "stt"), STTConfig))
     tts = TTSConfig(**_filter(_section(data, "tts"), TTSConfig))
     leds = LEDConfig(**_filter(_section(data, "leds"), LEDConfig))
+    mqtt = MqttConfig(**_filter(_section(data, "mqtt"), MqttConfig))
+    if mqtt.enabled and not mqtt.host:
+        raise ConfigError("mqtt.enabled requires mqtt.host")
+    if not mqtt.device_id:
+        import socket
+
+        mqtt.device_id = socket.gethostname().split(".")[0].lower() or "hermes-satellite"
+
 
     # Fill LED SPI defaults from the hardware profile.
     if leds.spi_bus is None:
@@ -220,6 +246,8 @@ def _build(data: dict, profile_override: Optional[str] = None) -> Config:
         stt=stt,
         tts=tts,
         leds=leds,
+        mqtt=mqtt,
+        data_dir=str(data.get("data_dir", "/var/lib/hermes-satellite")),
         log_level=log_level,
     )
     _apply_env_overrides(config)
@@ -247,6 +275,9 @@ def _apply_env_overrides(config: Config) -> None:
     access_key = os.environ.get(ENV_PORCUPINE_ACCESS_KEY)
     if access_key:
         config.wakeword.access_key = access_key
+    mqtt_password = os.environ.get(ENV_MQTT_PASSWORD)
+    if mqtt_password:
+        config.mqtt.password = mqtt_password
 
 
 def load_config(path: str, profile_override: Optional[str] = None) -> Config:

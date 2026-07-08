@@ -13,6 +13,8 @@ authors = [{ name = "Duane" }]
 dependencies = [
     "PyYAML>=5.4",
     "requests>=2.25",
+    # Home Assistant integration (outbound-only MQTT); tiny and pure-Python.
+    "paho-mqtt>=1.6",
 ]
 
 [project.optional-dependencies]

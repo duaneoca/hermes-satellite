@@ -87,6 +87,11 @@ class PiperTTS(TTSEngine):
     def sample_rate(self) -> int:
         return self._rate
 
+    def reload(self) -> None:
+        """Drop the loaded voice; the next synthesize picks up config changes
+        (e.g. a new tts.voice set at runtime)."""
+        self._voice = None
+
     def _knob_kwargs(self) -> dict:
         cfg = self._config
         if cfg.speaker_id is None and cfg.length_scale is None and cfg.volume == 1.0:
