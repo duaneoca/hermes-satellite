@@ -93,9 +93,13 @@ A single `config.yaml` (see `config.example.yaml`). Loaded and validated by
 
 - `hardware_profile` selects SPI numbering, GPIO backend and LED count defaults.
   Override on the CLI with `--hardware-profile`.
-- Secrets (`hermes.api_key`, `hermes.session_key`, `wakeword.access_key`) may be
-  left blank and supplied via env vars `HERMES_API_KEY`, `HERMES_SESSION_KEY`,
-  `PORCUPINE_ACCESS_KEY`, which **override** file values.
+- **Credentials never live in `config.yaml`.** They come from (highest
+  precedence first): real environment variables (`HERMES_API_KEY`,
+  `HERMES_SESSION_KEY`, `PORCUPINE_ACCESS_KEY`, `MQTT_PASSWORD`), then a
+  `secrets.env` file **next to the config** (0600; the wizard's Save writes
+  it automatically, stripping any keys out of the yaml), then — discouraged —
+  values in the yaml itself. Deployed, the same `secrets.env` is what the
+  systemd unit's `EnvironmentFile` reads.
 - `leds.spi_bus` / `leds.spi_device` default from the profile; override if your
   kernel enumerates SPI differently (common on Pi 5 — see the Pi 5 guide).
 
@@ -190,18 +194,20 @@ stays your user's and is unrelated to the deployed copy.
    ```
    (On Bookworm, plain `python3 -m venv` with the system 3.11 avoids all of
    this.)
-2. Config and secrets (admin-owned, service-readable where needed):
+2. Config and secrets (admin-owned, service-readable where needed). The
+   wizard's Save already produced both files next to your clone's config —
+   a credential-free `config.yaml` and a 0600 `secrets.env`:
    ```bash
    sudo mkdir -p /etc/hermes-satellite
    sudo cp config.yaml /etc/hermes-satellite/config.yaml       # your tuned config
    sudo chown root:hermes-sat /etc/hermes-satellite/config.yaml
    sudo chmod 640 /etc/hermes-satellite/config.yaml
-   sudo tee /etc/hermes-satellite/secrets.env >/dev/null <<'EOF'
-   HERMES_API_KEY=...
-   HERMES_SESSION_KEY=...
-   EOF
+   sudo cp secrets.env /etc/hermes-satellite/secrets.env
+   sudo chown root:root /etc/hermes-satellite/secrets.env
    sudo chmod 600 /etc/hermes-satellite/secrets.env
    ```
+   (Add `HERMES_SESSION_KEY=...` to secrets.env if you prefer it out of the
+   yaml too; it's a scoping label rather than a credential.)
 3. Data directory (the only place the service writes) — move models in and
    pre-seed the Moonshine cache so first start needs no egress:
    ```bash

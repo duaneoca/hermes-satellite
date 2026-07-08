@@ -1,5 +1,8 @@
-# Local runtime config (may contain secrets) — copy config.example.yaml -> config.yaml
+# Local runtime config — copy config.example.yaml -> config.yaml.
+# Secrets live in secrets.env; wizard save keeps timestamped backups.
 config.yaml
+config.yaml.bak-*
+secrets.env
 
 # Python
 __pycache__/

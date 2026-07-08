@@ -176,7 +176,8 @@ def _section(data: dict, key: str) -> dict:
     return value
 
 
-def _build(data: dict, profile_override: Optional[str] = None) -> Config:
+def _build(data: dict, profile_override: Optional[str] = None,
+           file_env: Optional[dict] = None) -> Config:
     """Build a :class:`Config` from an already-parsed mapping."""
     if not isinstance(data, dict):
         raise ConfigError("Top-level config must be a mapping")
@@ -250,7 +251,7 @@ def _build(data: dict, profile_override: Optional[str] = None) -> Config:
         data_dir=str(data.get("data_dir", "/var/lib/hermes-satellite")),
         log_level=log_level,
     )
-    _apply_env_overrides(config)
+    _apply_env_overrides(config, file_env)
     return config
 
 
@@ -265,17 +266,39 @@ def _filter(data: dict, cls: type) -> dict[str, Any]:
     return dict(data)
 
 
-def _apply_env_overrides(config: Config) -> None:
-    api_key = os.environ.get(ENV_HERMES_API_KEY)
+def _read_secrets_env(path) -> dict:
+    """Parse KEY=VALUE lines from a secrets.env next to the config file.
+
+    Gives interactive runs the same secret source systemd's EnvironmentFile
+    provides the service; real environment variables still win.
+    """
+    secrets = {}
+    try:
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            secrets[key.strip()] = value.strip().strip("'\"")
+    except OSError:
+        pass
+    return secrets
+
+
+def _apply_env_overrides(config: Config, file_env: Optional[dict] = None) -> None:
+    def get(name):
+        return os.environ.get(name) or (file_env or {}).get(name)
+
+    api_key = get(ENV_HERMES_API_KEY)
     if api_key:
         config.hermes.api_key = api_key
-    session_key = os.environ.get(ENV_HERMES_SESSION_KEY)
+    session_key = get(ENV_HERMES_SESSION_KEY)
     if session_key:
         config.hermes.session_key = session_key
-    access_key = os.environ.get(ENV_PORCUPINE_ACCESS_KEY)
+    access_key = get(ENV_PORCUPINE_ACCESS_KEY)
     if access_key:
         config.wakeword.access_key = access_key
-    mqtt_password = os.environ.get(ENV_MQTT_PASSWORD)
+    mqtt_password = get(ENV_MQTT_PASSWORD)
     if mqtt_password:
         config.mqtt.password = mqtt_password
 
@@ -293,4 +316,7 @@ def load_config(path: str, profile_override: Optional[str] = None) -> Config:
         raise ConfigError(f"Config file not found: {path}") from exc
     except yaml.YAMLError as exc:
         raise ConfigError(f"Invalid YAML in {path}: {exc}") from exc
-    return _build(data, profile_override)
+    from pathlib import Path
+
+    file_env = _read_secrets_env(Path(path).parent / "secrets.env")
+    return _build(data, profile_override, file_env)

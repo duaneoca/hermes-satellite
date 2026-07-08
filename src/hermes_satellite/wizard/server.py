@@ -303,6 +303,16 @@ class WizardState:
         return checks
 
     # -- save --------------------------------------------------------------------
+    # Credentials never go into config.yaml — they are extracted into a
+    # sibling secrets.env (0600), the same file systemd's EnvironmentFile
+    # reads after deployment; the config loader also reads it for
+    # interactive runs.
+    SECRET_FIELDS = (
+        ("hermes", "api_key", "HERMES_API_KEY"),
+        ("wakeword", "access_key", "PORCUPINE_ACCESS_KEY"),
+        ("mqtt", "password", "MQTT_PASSWORD"),
+    )
+
     def save(self) -> dict:
         cfg = self.config
         data = {
@@ -315,6 +325,13 @@ class WizardState:
             data[section] = {
                 k: v for k, v in obj.__dict__.items() if not k.startswith("_")
             }
+        # strip secrets from the yaml; collect them for secrets.env
+        secrets_out = {}
+        for section, field, env_name in self.SECRET_FIELDS:
+            value = data[section].get(field)
+            if value:
+                secrets_out[env_name] = value
+            data[section][field] = ""
         target = Path(self.config_path)
         backup = None
         try:
@@ -329,9 +346,24 @@ class WizardState:
                          "wizard with sudo, or point --config at a writable "
                          "copy",
             }
+        secrets_path = None
+        if secrets_out:
+            secrets_path = target.parent / "secrets.env"
+            existing = {}
+            if secrets_path.exists():
+                for line in secrets_path.read_text().splitlines():
+                    if "=" in line and not line.lstrip().startswith("#"):
+                        k, _, v = line.partition("=")
+                        existing[k.strip()] = v.strip()
+            existing.update(secrets_out)
+            secrets_path.write_text(
+                "".join(f"{k}={v}\n" for k, v in sorted(existing.items()))
+            )
+            secrets_path.chmod(0o600)
         return {
             "written": str(target),
             "backup": str(backup) if backup else None,
+            "secrets": str(secrets_path) if secrets_path else None,
             "changes": self.pending,
         }
 

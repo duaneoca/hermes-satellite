@@ -181,3 +181,27 @@ def test_log_level_parses_and_validates(tmp_path):
             wakeword:
               model_path: hey_jarvis
         """))
+
+
+def test_secrets_env_file_next_to_config_is_read(tmp_path, monkeypatch):
+    monkeypatch.delenv("HERMES_API_KEY", raising=False)
+    (tmp_path / "secrets.env").write_text(
+        "HERMES_API_KEY=from-file\n# comment\nMQTT_PASSWORD=broker-pw\n")
+    cfg = load_config(_write(tmp_path, """
+        hardware_profile: mock
+        wakeword:
+          model_path: hey_jarvis
+    """))
+    assert cfg.hermes.api_key == "from-file"
+    assert cfg.mqtt.password == "broker-pw"
+
+
+def test_real_env_beats_secrets_env_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_API_KEY", "from-env")
+    (tmp_path / "secrets.env").write_text("HERMES_API_KEY=from-file\n")
+    cfg = load_config(_write(tmp_path, """
+        hardware_profile: mock
+        wakeword:
+          model_path: hey_jarvis
+    """))
+    assert cfg.hermes.api_key == "from-env"

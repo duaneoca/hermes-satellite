@@ -297,3 +297,28 @@ def test_ensure_voices_dir(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="sudo mkdir -p"):
         _ensure_voices_dir(cfg2)
     locked.chmod(0o755)
+
+
+def test_save_strips_secrets_into_secrets_env(wizard, tmp_path, monkeypatch):
+    import os
+    import yaml
+    state, base = wizard
+    state.config.hermes.api_key = "sk-supersecret-1234"
+    state.config.mqtt.password = "broker-pw"
+    code, result = _post(f"{base}/api/save?token={state.token}")
+    # no credentials anywhere in the yaml
+    text = open(state.config_path).read()
+    assert "supersecret" not in text and "broker-pw" not in text
+    saved = yaml.safe_load(open(state.config_path))
+    assert saved["hermes"]["api_key"] == ""
+    assert saved["mqtt"]["password"] == ""
+    # secrets landed in a 0600 sibling env file
+    assert result["secrets"].endswith("secrets.env")
+    content = open(result["secrets"]).read()
+    assert "HERMES_API_KEY=sk-supersecret-1234" in content
+    assert "MQTT_PASSWORD=broker-pw" in content
+    assert oct(os.stat(result["secrets"]).st_mode & 0o777) == "0o600"
+    # and the loader picks them right back up
+    from hermes_satellite.config import load_config
+    reloaded = load_config(state.config_path)
+    assert reloaded.hermes.api_key == "sk-supersecret-1234"

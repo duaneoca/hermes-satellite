@@ -48,9 +48,11 @@ open**.
 7. **Review & save** — collected changes are listed; **Save
    configuration** first copies your current config to a timestamped
    backup (`config.yaml.bak-YYYYMMDD-HHMMSS`) and then updates
-   `config.yaml` in place. Restart the daemon to apply. (Comments in the
-   config file are not preserved by the rewrite — they live on in the
-   backup.)
+   `config.yaml` in place. **Credentials are stripped from the yaml and
+   written to a 0600 `secrets.env` beside it** — the same file the daemon
+   reads interactively and systemd's `EnvironmentFile` reads when
+   deployed. Restart the daemon to apply. (Comments in the config file
+   are not preserved by the rewrite — they live on in the backup.)
 
 Changes made in sections 2–6 apply to the wizard's live session immediately
 (so previews/tests use them), and land in the review file at the end.
