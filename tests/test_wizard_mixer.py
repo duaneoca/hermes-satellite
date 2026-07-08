@@ -78,11 +78,24 @@ def test_apply_recipe_reports_applied_and_failed(monkeypatch):
     assert ["amixer", "-c", "3", "sset", "Capture", "63", "cap"] in calls
 
 
-def test_store_reports_root_hint_on_failure(monkeypatch):
+def test_store_tries_sudo_then_reports_hint(monkeypatch):
+    calls = []
+
     def run(args, capture_output=True, text=True, timeout=10):
+        calls.append(args)
         return types.SimpleNamespace(returncode=1, stdout="", stderr="Permission denied")
 
     monkeypatch.setattr(subprocess, "run", run)
     result = mixer.store()
+    assert calls == [["alsactl", "store"], ["sudo", "-n", "alsactl", "store"]]
     assert result["ok"] is False
     assert "sudo alsactl store" in result["hint"]
+
+
+def test_store_succeeds_via_sudo_fallback(monkeypatch):
+    def run(args, capture_output=True, text=True, timeout=10):
+        rc = 0 if args[0] == "sudo" else 1
+        return types.SimpleNamespace(returncode=rc, stdout="", stderr="denied")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    assert mixer.store() == {"ok": True}

@@ -284,10 +284,19 @@ def _make_handler(state: WizardState):
                     for i, d in enumerate(sd.query_devices())
                 ]
                 audio = state.config.audio
+                defaults = {"in": None, "out": None}
+                try:
+                    default_in, default_out = sd.default.device
+                    defaults["in"] = default_in if default_in >= 0 else None
+                    defaults["out"] = default_out if default_out >= 0 else None
+                except Exception:  # no defaults on this host
+                    pass
                 self._json({"devices": devices,
                             "input_device": audio.input_device,
                             "output_device": audio.output_device,
-                            "input_channels": audio.input_channels})
+                            "input_channels": audio.input_channels,
+                            "default_input": defaults["in"],
+                            "default_output": defaults["out"]})
             elif route == "/api/meter":
                 self._json({"rms_pct": state.meter.rms_pct,
                             "p99_pct": state.meter.p99_pct})

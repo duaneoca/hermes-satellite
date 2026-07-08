@@ -63,7 +63,7 @@ behind your back.</p>
   meter above.</p>
   <label>Card <select id="card" onchange="loadMixer()"></select></label>
   <button onclick="applyRecipe()">Auto-configure microphone &amp; speaker</button>
-  <button onclick="mixerStore()">Keep levels after reboot</button>
+  <button onclick="mixerStore()">Save levels</button>
   <span id="mixmsg" class="muted"></span>
   <div id="sliders"></div>
 </section>
@@ -132,15 +132,19 @@ function loadAudio() {
       "<tr><th>#</th><th>device</th><th>in</th><th>out</th></tr>" +
       a.devices.map(d => `<tr><td>${d.index}</td><td>${d.name}</td>` +
         `<td>${d.inputs}</td><td>${d.outputs}</td></tr>`).join("");
-    const mk = (sel, filter, current) => {
+    const name = i => { const d = a.devices[i];
+      return d ? `${d.index}: ${d.name.slice(0, 30)}` : null; };
+    const mk = (sel, filter, current, dflt) => {
       const el = document.getElementById(sel);
-      el.innerHTML = "<option value=''>default</option>" + a.devices
+      const resolved = dflt !== null ? name(dflt) : null;
+      el.innerHTML = `<option value=''>system default` +
+        `${resolved ? " (→ " + resolved + ")" : ""}</option>` + a.devices
         .filter(filter).map(d =>
           `<option value="${d.index}" ${d.index===current?"selected":""}>` +
           `${d.index}: ${d.name.slice(0, 34)}</option>`).join("");
     };
-    mk("in_dev",  d => d.inputs  > 0, a.input_device);
-    mk("out_dev", d => d.outputs > 0, a.output_device);
+    mk("in_dev",  d => d.inputs  > 0, a.input_device,  a.default_input);
+    mk("out_dev", d => d.outputs > 0, a.output_device, a.default_output);
     document.getElementById("in_ch").value = a.input_channels;
   });
 }

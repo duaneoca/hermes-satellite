@@ -108,15 +108,22 @@ def apply_recipe(card: str) -> dict:
 
 
 def store() -> dict:
-    """Persist mixer state. Usually needs root; report rather than fail."""
-    try:
-        result = subprocess.run(
-            ["alsactl", "store"], capture_output=True, text=True, timeout=10
-        )
-    except OSError as exc:
-        return {"ok": False, "hint": f"alsactl unavailable: {exc}"}
-    if result.returncode == 0:
-        return {"ok": True}
+    """Persist mixer state across reboots.
+
+    Writing /var/lib/alsa/asound.state needs root, so after a plain attempt
+    we try non-interactive sudo (``sudo -n`` — succeeds on stock Raspberry
+    Pi OS where the default user has passwordless sudo; a fixed command
+    list, never a shell). Only if both fail do we hand back the command.
+    """
+    for command in (["alsactl", "store"], ["sudo", "-n", "alsactl", "store"]):
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=10
+            )
+        except OSError as exc:
+            return {"ok": False, "hint": f"alsactl unavailable: {exc}"}
+        if result.returncode == 0:
+            return {"ok": True}
     return {
         "ok": False,
         "hint": "needs root — run on the device:  sudo alsactl store",
