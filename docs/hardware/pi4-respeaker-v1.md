@@ -250,9 +250,23 @@ hermes-satellite --demo --config config.yaml
 ```
 
 Expect the 3 LEDs to breathe/animate and the HAT button to toggle the red MUTED
-state. Then set the wake word model and the Piper voice (see
-[wakeword.md](../wakeword.md), [piper.md](../piper.md)) and run without
-`--demo` for the full pipeline.
+state.
+
+---
+
+> ### ✅ All done here? Next step: the setup wizard
+>
+> ```bash
+> hermes-satellite setup --config config.yaml
+> ```
+>
+> It walks mic calibration, wake word choice + threshold, a transcription
+> check, voice audition, Hermes connection and conversation settings, then
+> writes your config — guide: [setup-wizard.md](../setup-wizard.md).
+> (Prefer configuring by hand? [wakeword.md](../wakeword.md) and
+> [piper.md](../piper.md), then run without `--demo`.)
+
+---
 
 ## Troubleshooting
 

@@ -311,6 +311,21 @@ ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
   the board, so new dependencies land too), and shows the service status
   after restart. No-op if already at the latest revision.
 
+---
+
+> ### ✅ All done here? Your satellite is complete
+>
+> Final rites:
+>
+> 1. `sudo /opt/hermes-satellite/.venv/bin/hermes-satellite doctor --config /etc/hermes-satellite/config.yaml`
+>    — everything ✓, exit 0.
+> 2. **Power-plug reboot test**: pull the plug, plug it back in, say the
+>    wake word once it settles. If that works, everything works.
+> 3. Optional: surface it in Home Assistant —
+>    [home-assistant.md](home-assistant.md) (MQTT is also a wizard section).
+
+---
+
 ## Testing / verification
 
 - `pytest` — state machine, LED controller, Hermes client, config.

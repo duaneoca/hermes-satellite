@@ -81,3 +81,14 @@ open**.
 
 Changes made in sections 2–8 apply to the wizard's live session immediately
 (so previews/tests use them), and land in the review file at the end.
+
+---
+
+> ### ✅ All done here? Next step: install it as a service
+>
+> Your tuned `config.yaml` + `secrets.env` are ready to deploy. Follow
+> [Running as a service](hermes-satellite.md#running-as-a-service) — it
+> creates the dedicated `hermes-sat` user and moves everything to its
+> system locations (`/opt`, `/etc`, `/var/lib`).
+> (Want to hear it first? `hermes-satellite --config config.yaml` runs the
+> full pipeline interactively — Ctrl-C to stop.)

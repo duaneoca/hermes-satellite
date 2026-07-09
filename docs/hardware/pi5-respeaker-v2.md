@@ -121,10 +121,23 @@ cp config.example.yaml config.yaml     # hardware_profile: pi5-respeaker-v2
 hermes-satellite --demo --config config.yaml   # LED + button smoke test
 ```
 
-Expect the 3 LEDs to animate and the button to toggle MUTED. Then set the
-wake word model and the Piper voice (see
-[wakeword.md](../wakeword.md), [piper.md](../piper.md)) and run without
-`--demo` for the full pipeline.
+Expect the 3 LEDs to animate and the button to toggle MUTED.
+
+---
+
+> ### ✅ All done here? Next step: the setup wizard
+>
+> ```bash
+> hermes-satellite setup --config config.yaml
+> ```
+>
+> It walks mic calibration, wake word choice + threshold, a transcription
+> check, voice audition, Hermes connection and conversation settings, then
+> writes your config — guide: [setup-wizard.md](../setup-wizard.md).
+> (Prefer configuring by hand? [wakeword.md](../wakeword.md) and
+> [piper.md](../piper.md), then run without `--demo`.)
+
+---
 
 ## Troubleshooting
 
