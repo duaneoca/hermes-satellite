@@ -135,7 +135,11 @@ class OpenWakeWord(WakeWordDetector):
             )
         return self._handle
 
-    def wait_for_wake(self, is_muted: Callable[[], bool]) -> bool:
+    def wait_for_wake(
+        self,
+        is_muted: Callable[[], bool],
+        cancel: Optional["threading.Event"] = None,
+    ) -> bool:
         import numpy as np
 
         handle = self._get_handle()
@@ -153,7 +157,9 @@ class OpenWakeWord(WakeWordDetector):
         self._mic.flush()  # never process stale audio (e.g. our own TTS)
         handle.reset()
         was_muted = False
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and not (
+            cancel is not None and cancel.is_set()
+        ):
             pcm = self._mic.read(FRAME_SAMPLES)
             if is_muted():
                 was_muted = True

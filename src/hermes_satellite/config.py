@@ -162,6 +162,11 @@ class ConversationConfig:
     follow_up_seconds: float = 6.0
     # Safety cap on consecutive follow-up turns from a single wake.
     max_turns: int = 8
+    # Barge-in: keep wake detection running WHILE the assistant speaks, so
+    # the wake word cuts playback short and starts a new turn. The speaker
+    # sits 5 cm from the mics, so detection competes with our own voice —
+    # works best at moderate volume.
+    barge_in: bool = False
 
 
 @dataclass

@@ -134,3 +134,44 @@ def test_sink_play_blocks_for_audio_duration(monkeypatch):
     started = time.monotonic()
     sink.play(pcm, 16000)
     assert time.monotonic() - started >= 0.1
+
+
+def test_sink_play_cancel_aborts_early(monkeypatch):
+    """A set cancel event must cut playback off well before the clip ends."""
+    import sys
+    import threading
+    import time
+    import types as t
+
+    aborted = []
+
+    class FakeOut:
+        latency = 0.01
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def write(self, pcm):
+            pass
+
+        def abort(self):
+            aborted.append(True)
+
+    sd = t.ModuleType("sounddevice")
+    sd.RawOutputStream = lambda **kw: FakeOut()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+
+    from hermes_satellite.audio.alsa_backend import AlsaAudioSink
+    from hermes_satellite.config import AudioConfig
+
+    sink = AlsaAudioSink(AudioConfig())
+    cancel = threading.Event()
+    cancel.set()
+    pcm = b"\x00\x00" * 32000  # 2 s at 16 kHz
+    started = time.monotonic()
+    sink.play(pcm, 16000, cancel=cancel)
+    assert time.monotonic() - started < 0.5
+    assert aborted

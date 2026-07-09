@@ -438,15 +438,17 @@ def test_behavior_prefill_reflects_config(wizard):
     assert body["max_turns"] == 8
     assert body["earcons"] is True
     assert body["earcon_volume"] == 0.5
+    assert body["barge_in"] is False
 
 
 def test_behavior_config_pends_and_applies_live(wizard):
     state, base = wizard
     # numbers arrive as strings from the page's inputs
     _post(f"{base}/api/behavior/config?token={state.token}",
-          {"follow_up": True, "follow_up_seconds": "8",
+          {"follow_up": True, "follow_up_seconds": "8", "barge_in": True,
            "max_turns": "4", "earcon_volume": "0.3", "stream": False})
     assert state.config.conversation.follow_up is True
+    assert state.config.conversation.barge_in is True
     assert state.config.conversation.follow_up_seconds == 8.0
     assert state.config.conversation.max_turns == 4
     assert state.config.earcons.volume == 0.3

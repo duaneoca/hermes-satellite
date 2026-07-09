@@ -19,10 +19,15 @@ class FakeWake:
     def __init__(self, results):
         self._r = list(results)
         self.on_exhausted = None  # lets run_forever tests stop the loop
+        self.cancelled = 0        # barge listeners cancelled at playback end
 
-    def wait_for_wake(self, is_muted):
+    def wait_for_wake(self, is_muted, cancel=None):
         if self._r:
             return self._r.pop(0)
+        if cancel is not None:
+            cancel.wait(2)  # barge listener: idle until playback ends
+            self.cancelled += 1
+            return False
         if self.on_exhausted is not None:
             self.on_exhausted()
         return False
@@ -68,8 +73,12 @@ class FakeTTS:
 class RecordingSink:
     def __init__(self):
         self.plays = 0
+        self.interrupted = 0
 
-    def play(self, pcm, sample_rate=None):
+    def play(self, pcm, sample_rate=None, cancel=None):
+        if cancel is not None and cancel.is_set():
+            self.interrupted += 1
+            return
         self.plays += 1
 
 
@@ -271,3 +280,58 @@ def test_stream_disabled_uses_blocking_even_if_supported():
     pipe.run_cycle()
     assert hermes.stream_calls == 0
     assert hermes.calls  # blocking path
+
+
+# --- barge-in ---------------------------------------------------------------
+
+def test_barge_in_interrupts_and_starts_new_turn():
+    # Wake #1 starts the cycle; the barge listener consumes wake #2 during
+    # the first reply's playback; the second turn's listener finds no more
+    # wakes and just waits for cancellation.
+    source = FakeSource([b"one", b"two"])
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True, True], source, ["one", "two"],
+        conversation=ConversationConfig(barge_in=True),
+    )
+    pipe.run_cycle()
+    assert [c[0] for c in hermes.calls] == ["one", "two"]
+    # both turns used the default onset timeout (a barge is a fresh wake,
+    # not a follow-up window)
+    assert source.onsets == [None, None]
+    # wake chime for the original wake and again for the barge
+    assert earcons.played == ["wake", "wake"]
+    assert sm.state is State.IDLE
+    # the second turn's listener was cancelled when its playback finished
+    assert pipe.wakeword.cancelled == 1
+
+
+def test_no_barge_when_disabled():
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True, True], FakeSource([b"one", b"two"]), ["one", "two"],
+    )
+    pipe.run_cycle()
+    # second wake result untouched: no barge listener ever ran
+    assert len(hermes.calls) == 1
+    assert pipe.wakeword._r == [True]
+    assert sm.state is State.IDLE
+
+
+def test_barge_in_streaming_reply():
+    hermes = StreamingHermes(
+        ["First sentence, quite long and complete. ",
+         "Second sentence never gets played."])
+    sm = StateMachine(initial=State.IDLE)
+    sink = RecordingSink()
+    source = FakeSource([b"q1", b"q2"])
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True, True]),
+        audio_source=source, stt=FakeSTT(["q1", "q2"]),
+        hermes=hermes, tts=CountingTTS(), audio_sink=sink,
+        session_key="k", is_muted=lambda: False, earcons=SpyEarcons(),
+        stream_replies=True,
+        conversation=ConversationConfig(barge_in=True),
+    )
+    pipe.run_cycle()
+    # both questions reached Hermes; no hang from the synth-ahead producer
+    assert [c[0] for c in hermes.calls] == ["q1", "q2"]
+    assert sm.state is State.IDLE

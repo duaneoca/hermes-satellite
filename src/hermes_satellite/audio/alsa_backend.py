@@ -118,13 +118,21 @@ class AlsaAudioSink(AudioSink):
     def __init__(self, config: AudioConfig):
         self._config = config
 
-    def play(self, pcm: bytes, sample_rate: Optional[int] = None) -> None:
+    def play(
+        self,
+        pcm: bytes,
+        sample_rate: Optional[int] = None,
+        cancel=None,
+    ) -> None:
         if not pcm:
             return
         import sounddevice as sd  # lazy
 
         rate = sample_rate or self._config.sample_rate
         duration = len(pcm) / 2 / rate
+        # ~100 ms write chunks so a barge-in `cancel` cuts playback off
+        # quickly instead of after the whole clip.
+        chunk = max(2, (rate // 10) * 2)
         started = time.monotonic()
         with sd.RawOutputStream(
             samplerate=rate,
@@ -132,7 +140,11 @@ class AlsaAudioSink(AudioSink):
             channels=1,
             dtype="int16",
         ) as out:
-            out.write(pcm)
+            for offset in range(0, len(pcm), chunk):
+                if cancel is not None and cancel.is_set():
+                    out.abort()  # drop what's buffered: silence *now*
+                    return
+                out.write(pcm[offset:offset + chunk])
             # write() returns once frames are *buffered*, and closing an
             # active stream discards whatever hasn't played yet — so without
             # this hold, short sounds (earcons) get cut off and play() returns
@@ -141,4 +153,10 @@ class AlsaAudioSink(AudioSink):
             # opens on our own output.
             latency = out.latency if isinstance(out.latency, float) else 0.0
             remaining = started + duration - time.monotonic()
-            time.sleep(max(0.0, remaining) + latency)
+            hold = max(0.0, remaining) + latency
+            deadline = time.monotonic() + hold
+            while time.monotonic() < deadline:
+                if cancel is not None and cancel.is_set():
+                    out.abort()
+                    return
+                time.sleep(min(0.05, hold))

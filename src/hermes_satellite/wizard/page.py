@@ -130,6 +130,10 @@ behind your back.</p>
   <label class="muted">Max turns per conversation
     <input id="bt" type="number" min="1" max="50" style="width:4rem"
       onchange="behavior({max_turns: this.value})"></label><br>
+  <label><input id="bb" type="checkbox" onchange="behavior({barge_in: this.checked})">
+    Barge-in — saying the wake word while the assistant is speaking cuts
+    the reply short and starts a new turn (works best at moderate
+    speaker volume)</label><br>
   <label><input id="be" type="checkbox" onchange="behavior({earcons: this.checked})">
     Sound cues — chime on wake, blip when the follow-up window opens,
     tone on error</label>
@@ -376,6 +380,7 @@ function loadBehavior() {
     document.getElementById("bf").checked = b.follow_up;
     document.getElementById("bw").value = b.follow_up_seconds;
     document.getElementById("bt").value = b.max_turns;
+    document.getElementById("bb").checked = b.barge_in;
     document.getElementById("be").checked = b.earcons;
     document.getElementById("bv").value = b.earcon_volume;
   });

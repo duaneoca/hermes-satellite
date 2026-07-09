@@ -35,8 +35,14 @@ class MockAudioSink(AudioSink):
     def __init__(self, config: AudioConfig):
         self._config = config
 
-    def play(self, pcm: bytes, sample_rate: Optional[int] = None) -> None:
+    def play(self, pcm: bytes, sample_rate: Optional[int] = None,
+             cancel=None) -> None:
         rate = sample_rate or self._config.sample_rate
         seconds = len(pcm) / 2 / rate
         logger.info("mock playback: %.1fs @ %d Hz", seconds, rate)
-        time.sleep(min(seconds, 2.0))
+        deadline = time.monotonic() + min(seconds, 2.0)
+        while time.monotonic() < deadline:
+            if cancel is not None and cancel.is_set():
+                logger.info("mock playback interrupted")
+                return
+            time.sleep(0.05)

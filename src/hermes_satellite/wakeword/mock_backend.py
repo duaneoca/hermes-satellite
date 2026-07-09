@@ -20,12 +20,14 @@ class MockWakeWord(WakeWordDetector):
         self._interval = interval
         self._stop = threading.Event()
 
-    def wait_for_wake(self, is_muted: Callable[[], bool]) -> bool:
+    def wait_for_wake(self, is_muted: Callable[[], bool], cancel=None) -> bool:
         waited = 0.0
         step = 0.1
         while not self._stop.is_set():
             self._stop.wait(step)
             if self._stop.is_set():
+                return False
+            if cancel is not None and cancel.is_set():
                 return False
             if is_muted():
                 waited = 0.0  # muted time doesn't count toward a wake

@@ -130,6 +130,10 @@ conversation:
   follow_up: false
   follow_up_seconds: 6.0   # how long to wait for a follow-up to begin
   max_turns: 8             # safety cap on back-to-back follow-ups
+  # Barge-in: saying the wake word WHILE the assistant is speaking cuts the
+  # reply short and starts a new turn. Detection competes with the speaker
+  # 5 cm from the mics — works best at moderate volume.
+  barge_in: false
 
 leds:
   backend: apa102          # apa102 | mock

@@ -76,12 +76,14 @@ class PorcupineWakeWord(WakeWordDetector):
             )
         return self._handle
 
-    def wait_for_wake(self, is_muted: Callable[[], bool]) -> bool:
+    def wait_for_wake(self, is_muted, cancel=None) -> bool:
         handle = self._get_handle()
         frame_length = handle.frame_length
         self._mic.start()
         self._mic.flush()  # never process stale audio (e.g. our own TTS)
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and not (
+            cancel is not None and cancel.is_set()
+        ):
             pcm = self._mic.read(frame_length)
             if is_muted():
                 continue  # drain the device but ignore audio entirely

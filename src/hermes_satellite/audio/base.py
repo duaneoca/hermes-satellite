@@ -6,6 +6,7 @@ sample rate (16 kHz for the Porcupine/Moonshine pipeline).
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
@@ -30,10 +31,17 @@ class AudioSink(ABC):
     """Plays back 16-bit PCM audio."""
 
     @abstractmethod
-    def play(self, pcm: bytes, sample_rate: Optional[int] = None) -> None:
+    def play(
+        self,
+        pcm: bytes,
+        sample_rate: Optional[int] = None,
+        cancel: Optional[threading.Event] = None,
+    ) -> None:
         """Play ``pcm`` (blocking until playback completes).
 
         ``sample_rate`` is the rate of ``pcm`` when it differs from the
         configured pipeline rate (e.g. a Piper voice's native rate); ``None``
-        means the configured ``audio.sample_rate``.
+        means the configured ``audio.sample_rate``. If ``cancel`` is given
+        and becomes set, playback stops as soon as possible (barge-in) and
+        the method returns without the usual drain hold.
         """

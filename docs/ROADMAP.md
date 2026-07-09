@@ -57,7 +57,11 @@ Reuses the proven guts: --ww-monitor, voices preview, wm8960-mixer.sh.
 - ✅ SSE streaming from Hermes + sentence-chunked Piper synthesis —
   shipped 2026-07-08.
 
-## V2+ — maybe
+## V2+
 
-- Barge-in (wake word interrupts playback).
-- Multi-satellite conventions (per-device session keys already exist).
+- ✅ Barge-in — shipped 2026-07-08 (`conversation.barge_in`, default off):
+  wake detection keeps running while the assistant speaks; the wake word
+  aborts playback (~100 ms) and starts a fresh turn. Detection competes
+  with the speaker 5 cm from the mics, so it works best at moderate volume.
+- Multi-satellite conventions — covered: per-device session keys give each
+  satellite its own Hermes memory scope; nothing further needed.

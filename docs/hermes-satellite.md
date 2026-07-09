@@ -143,9 +143,9 @@ open for `follow_up_seconds`.
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
 
-## Earcons & follow-up mode
+## Earcons, follow-up mode & barge-in
 
-Two conversational conveniences layer on the pipeline (`core/pipeline.py`):
+Three conversational conveniences layer on the pipeline (`core/pipeline.py`):
 
 - **Earcons** (`core/earcons.py`): short synthesized tones — a rising chime
   the instant the wake word fires (so you know it heard you without watching
@@ -159,6 +159,18 @@ Two conversational conveniences layer on the pipeline (`core/pipeline.py`):
   machine and LEDs need no special cases. A soft "listening" chime marks each
   re-open; `conversation.max_turns` caps consecutive follow-ups. The mic is
   flushed after each chime so the tone's own echo can't false-trigger capture.
+- **Barge-in** (`conversation.barge_in`, default off): while the assistant
+  speaks, a listener thread keeps wake detection running on the shared mic
+  (nobody else reads it during playback). A detection sets a cancel event
+  that playback checks every ~100 ms write chunk, aborting the output stream
+  — silence within a beat — and the pipeline starts a fresh turn (wake
+  chime, flush, capture with the normal timeout; the turn counter resets
+  since a barge is a new conversation). The listener is *cancelled*, never
+  `stop()`ed, at the end of each playback, so the detector stays usable.
+  Physics caveat: the speaker sits 5 cm from the mics, so your wake word
+  competes with the assistant's own voice — moderate playback volume helps,
+  and there is no echo cancellation. In streaming mode a barge also tells
+  the synth-ahead thread to abandon the rest of the reply.
 
 ## Logging & SD-card wear
 

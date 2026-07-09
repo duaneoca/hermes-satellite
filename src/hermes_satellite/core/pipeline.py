@@ -20,7 +20,9 @@ muted, wake detection and capture ignore all audio.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 import time
 from typing import Callable, Optional
 
@@ -81,6 +83,9 @@ class Pipeline:
         self._mic_flush = mic_flush
         self.stream_replies = stream_replies
         self._running = False
+        # Set while playback is interrupted by a barge-in wake word; consumed
+        # by run_cycle to start a fresh turn instead of going idle.
+        self._barged = False
 
     def _chime(self, cue: str) -> None:
         if self.earcons is not None:
@@ -92,6 +97,39 @@ class Pipeline:
             return
         time.sleep(MIC_SETTLE_S)
         self._mic_flush()
+
+    @contextlib.contextmanager
+    def _barge_listener(self):
+        """Run wake detection during playback (barge-in).
+
+        Yields an Event that fires on a mid-playback wake word; pass it to
+        ``audio_sink.play(cancel=...)`` so detection cuts the audio short.
+        Yields None when barge-in is disabled. On exit, the listener is
+        cancelled (not stopped — the detector stays usable) and
+        ``self._barged`` records whether a barge happened.
+        """
+        if not self.conversation.barge_in:
+            yield None
+            return
+        interrupt = threading.Event()
+        done = threading.Event()
+
+        def listen():
+            try:
+                if self.wakeword.wait_for_wake(self.is_muted, cancel=done):
+                    logger.info("barge-in: wake word during playback")
+                    interrupt.set()
+            except Exception:  # never let the listener kill playback
+                logger.exception("barge listener failed")
+
+        listener = threading.Thread(target=listen, daemon=True)
+        listener.start()
+        try:
+            yield interrupt
+        finally:
+            done.set()
+            listener.join(timeout=2)
+            self._barged = interrupt.is_set()
 
     def _handle_turn(self, onset_timeout: Optional[float]) -> bool:
         """Capture -> STT -> Hermes -> TTS -> play one turn.
@@ -139,7 +177,8 @@ class Pipeline:
             logger.debug("sanitized reply for speech: %s", speakable)
 
         pcm = self.tts.synthesize(speakable)
-        self.audio_sink.play(pcm, self.tts.sample_rate)
+        with self._barge_listener() as interrupt:
+            self.audio_sink.play(pcm, self.tts.sample_rate, cancel=interrupt)
         return True
 
     def _stream_reply(self, text: str) -> bool:
@@ -170,31 +209,52 @@ class Pipeline:
         spoken: list = []
         pcm_queue: _queue.Queue = _queue.Queue(maxsize=2)
         _END = object()
+        abort = _threading.Event()  # tells the producer to stop synthesizing
+
+        def _put(item) -> bool:
+            while not abort.is_set():
+                try:
+                    pcm_queue.put(item, timeout=0.25)
+                    return True
+                except _queue.Full:
+                    continue
+            return False
 
         def synthesize_ahead():
             try:
                 for sentence in _chain_first(first, sentences):
+                    if abort.is_set():
+                        return
                     spoken.append(sentence)
                     speakable = make_speakable(sentence)
-                    if speakable:
-                        pcm_queue.put(self.tts.synthesize(speakable))
-                pcm_queue.put(_END)
+                    if speakable and not _put(self.tts.synthesize(speakable)):
+                        return
+                _put(_END)
             except Exception as exc:  # surfaced to the playback loop
-                pcm_queue.put(exc)
+                _put(exc)
 
         producer = _threading.Thread(target=synthesize_ahead, daemon=True)
         producer.start()
         try:
-            while True:
-                item = pcm_queue.get()
-                if item is _END:
-                    break
-                if isinstance(item, Exception):
-                    raise item
-                self.audio_sink.play(item, self.tts.sample_rate)
+            with self._barge_listener() as interrupt:
+                while True:
+                    if interrupt is not None and interrupt.is_set():
+                        break  # barged: stop speaking mid-reply
+                    try:
+                        item = pcm_queue.get(timeout=0.2)
+                    except _queue.Empty:
+                        continue
+                    if item is _END:
+                        break
+                    if isinstance(item, Exception):
+                        raise item
+                    self.audio_sink.play(
+                        item, self.tts.sample_rate, cancel=interrupt
+                    )
         finally:
-            # If playback failed, the producer may be blocked on a full
-            # queue — drain so it can finish, then join.
+            # Stop the producer (it may be mid-synthesis or blocked on a
+            # full queue), drain what it already queued, then join.
+            abort.set()
             try:
                 while True:
                     pcm_queue.get_nowait()
@@ -225,6 +285,17 @@ class Pipeline:
                 return
             turns += 1
             # A successful turn ended with PLAYBACK_DONE, so we're at IDLE.
+            if self._barged:
+                # The wake word cut playback short: start a fresh turn,
+                # exactly like a normal wake (the barge listener already
+                # consumed the wake word itself).
+                self._barged = False
+                self.sm.dispatch(Event.WAKE_DETECTED)
+                self._chime("wake")
+                self._flush_mic()
+                onset = None
+                turns = 0  # a barge is a new conversation
+                continue
             if not self.conversation.follow_up or turns >= self.conversation.max_turns:
                 return
             # Re-open for a follow-up turn as a virtual wake (IDLE -> WAKE).

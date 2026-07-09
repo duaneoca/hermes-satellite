@@ -60,7 +60,8 @@ open**.
 7. **Hermes** — health + authenticated round-trip chat test.
 8. **Conversation & sounds** — streamed replies (speak while the rest of
    the answer is still arriving), follow-up mode (window length + max
-   turns per conversation), and earcons (enable + volume).
+   turns per conversation), barge-in (the wake word interrupts a reply),
+   and earcons (enable + volume).
 9. **Home Assistant (MQTT)** — enable toggle, broker settings with a
    masked password (kept in `secrets.env`), and a live broker connection
    test that distinguishes unreachable / auth-refused / connected.
