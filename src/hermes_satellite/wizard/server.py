@@ -270,64 +270,12 @@ class WizardState:
         self.pending[f"{section}.{field}"] = value
 
     # -- doctor -----------------------------------------------------------------
-    @staticmethod
-    def _board_model(path: str = "/proc/device-tree/model") -> str:
-        try:
-            return Path(path).read_text().rstrip("\x00").strip()
-        except OSError:
-            return ""
-
     def status(self) -> dict:
-        cfg = self.config
-        checks = {}
-        checks["profile"] = cfg.hardware_profile
-        board = self._board_model()
-        if board:
-            checks["board"] = board
-            expected = None
-            if "Raspberry Pi 4" in board:
-                expected = "pi4"
-            elif "Raspberry Pi 5" in board:
-                expected = "pi5"
-            if expected and not cfg.hardware_profile.startswith(expected):
-                checks["profile_warning"] = (
-                    f"this board is a {board!r} but hardware_profile is "
-                    f"{cfg.hardware_profile!r} — set hardware_profile: "
-                    f"{expected}-respeaker-v1"
-                    if expected == "pi4" else
-                    f"this board is a {board!r} but hardware_profile is "
-                    f"{cfg.hardware_profile!r} — set hardware_profile: "
-                    f"{expected}-respeaker-v2"
-                )
-        spidev = Path(f"/dev/spidev{cfg.leds.spi_bus}.{cfg.leds.spi_device}")
-        checks["spidev"] = spidev.exists() or f"missing {spidev}"
-        try:
-            import onnxruntime
-            ver = onnxruntime.__version__
-            checks["onnxruntime"] = ver if ver < "1.27" else f"{ver} — BROKEN, pin <1.27"
-        except ImportError:
-            checks["onnxruntime"] = "not installed"
-        cards = [c["id"] for c in mixer.list_cards()]
-        checks["alsa_cards"] = cards or "none found"
-        if cfg.hardware_profile.startswith("pi") and not any(
-            "seeed" in c.lower() or "wm8960" in c.lower() for c in cards
-        ):
-            checks["alsa_cards_warning"] = (
-                "no ReSpeaker/seeed card — audio overlay not installed or not "
-                "rebooted? See your hardware guide, section 1"
-            )
-        voices = sorted(p.stem for p in Path(cfg.tts.voices_dir).glob("*.onnx")) \
-            if Path(cfg.tts.voices_dir).exists() else []
-        checks["voices_downloaded"] = voices or "none"
-        try:
-            import requests
-            r = requests.get(
-                f"http://{cfg.hermes.host}:{cfg.hermes.port}/health", timeout=3
-            )
-            checks["hermes_health"] = f"HTTP {r.status_code}"
-        except Exception as exc:
-            checks["hermes_health"] = f"unreachable ({type(exc).__name__})"
-        return checks
+        """Shared health checks (see doctor.py), rendered for the page."""
+        from ..doctor import run_checks
+
+        marks = {True: "✓ ", False: "✗ ", None: ""}
+        return {c.name: f"{marks[c.ok]}{c.detail}" for c in run_checks(self.config)}
 
     # -- save --------------------------------------------------------------------
     # Credentials never go into config.yaml — they are extracted into a

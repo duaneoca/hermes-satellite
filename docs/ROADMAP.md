@@ -13,11 +13,11 @@ misleading level metrics), not the config file itself.
   calibration with a live level meter (target p99 30-70%), speaker test tone,
   `alsactl store`, write `config.yaml`, optionally install the systemd unit.
   Everything docs/hardware/pi4-respeaker-v1.md does by hand, guided.
-- **`hermes-satellite doctor`** (partially shipped: the wizard's Status
-  section covers card/board/onnxruntime/models/Hermes checks; a
-  standalone CLI one-shot remains): one-shot health check — card present, mixer
-  routing sane, capture level in range, SPI node, group membership, Hermes
-  reachability, onnxruntime version (< 1.27), model files present.
+- ✅ **`hermes-satellite doctor`** — shipped 2026-07-08: one-shot CLI health
+  check (board vs profile, SPI node, ALSA card, onnxruntime pin, wake model
+  files, Moonshine cache, voices, data dir, Hermes reachability); exit code 1
+  on failure so scripts can gate on it. Same checks power the wizard's
+  Status section (shared `doctor.py`).
 - ✅ Earcons (wake chime / error tone) — shipped 2026-07-08.
 - ✅ Follow-up conversation mode — shipped 2026-07-08.
 - Wizard transcription-test section (exam finding: STT is the one stage

@@ -275,6 +275,13 @@ ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
 
 * `~/configure-satellite` — runs the [setup wizard](setup-wizard.md)
   against the live `/etc/hermes-satellite/config.yaml`.
+* `hermes-satellite doctor` — one-shot health check from a shell (no
+  wizard needed): board vs profile, SPI, ALSA card, onnxruntime pin, model
+  files, Hermes reachability. Exit code 1 if anything failed. On a deployed
+  satellite:
+  ```bash
+  sudo /opt/hermes-satellite/.venv/bin/hermes-satellite doctor --config /etc/hermes-satellite/config.yaml
+  ```
 * `~/update-satellite` — pulls the latest revision into `/opt`,
   reinstalls into the venv (auto-detects the `[pi4]`/`[pi5]` extra from
   the board, so new dependencies land too), and shows the service status

@@ -252,13 +252,14 @@ def test_status_warns_when_seeed_card_missing(wizard, monkeypatch):
     state, base = wizard
     state.config.hardware_profile = "pi4-respeaker-v1"
     _, status = _get(f"{base}/api/status?token={state.token}")
-    assert status["alsa_cards"] == ["Headphones"]
-    assert "overlay" in status["alsa_cards_warning"]
-    # with the seeed card present, no warning
+    assert status["alsa_cards"].startswith("✗")
+    assert "Headphones" in status["alsa_cards"]
+    assert "overlay" in status["alsa_cards"]
+    # with the seeed card present, the check passes
     monkeypatch.setattr(mixer_mod, "list_cards",
                         lambda *a, **k: [{"index": 3, "id": "seeed2micvoicec"}])
     _, status = _get(f"{base}/api/status?token={state.token}")
-    assert "alsa_cards_warning" not in status
+    assert status["alsa_cards"] == "✓ seeed2micvoicec"
 
 
 def test_ensure_voices_dir(tmp_path, monkeypatch):
@@ -332,23 +333,20 @@ def test_save_strips_secrets_into_secrets_env(wizard, tmp_path, monkeypatch):
     assert reloaded.hermes.api_key == "sk-supersecret-1234"
 
 
-def test_status_warns_on_board_profile_mismatch(wizard, monkeypatch, tmp_path):
-    from hermes_satellite.wizard.server import WizardState
-    model_file = tmp_path / "model"
-    model_file.write_text("Raspberry Pi 4 Model B Rev 1.5\x00")
-    monkeypatch.setattr(
-        WizardState, "_board_model",
-        staticmethod(lambda path="/x": model_file.read_text().rstrip("\x00").strip()),
-    )
+def test_status_warns_on_board_profile_mismatch(wizard, monkeypatch):
+    from hermes_satellite import doctor as doctor_mod
+    monkeypatch.setattr(doctor_mod, "_board_model",
+                        lambda path="/x": "Raspberry Pi 4 Model B Rev 1.5")
     state, base = wizard
     state.config.hardware_profile = "pi5-respeaker-v2"
     _, status = _get(f"{base}/api/status?token={state.token}")
+    assert status["board"].startswith("✗")
     assert "Raspberry Pi 4" in status["board"]
-    assert "pi4-respeaker-v1" in status["profile_warning"]
-    # matching profile: no warning
+    assert "pi4-respeaker-v1" in status["board"]
+    # matching profile: check passes
     state.config.hardware_profile = "pi4-respeaker-v1"
     _, status = _get(f"{base}/api/status?token={state.token}")
-    assert "profile_warning" not in status
+    assert status["board"] == "✓ Raspberry Pi 4 Model B Rev 1.5"
 
 
 def test_pa_alsa_plughw_defaulted():

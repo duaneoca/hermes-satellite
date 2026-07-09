@@ -82,6 +82,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--idle-timeout-min", type=float, default=15.0,
         help="auto-exit after this many idle minutes",
     )
+
+    doctor = sub.add_parser(
+        "doctor",
+        help="one-shot health check (board, audio card, models, Hermes "
+             "reachability); exit code 1 if anything failed",
+    )
+    _accept_global_flags(doctor)
     return parser
 
 
@@ -228,6 +235,11 @@ def main(argv=None) -> int:
 
     if getattr(args, "command", None) == "voices":
         return _run_voices(config, args)
+
+    if getattr(args, "command", None) == "doctor":
+        from .doctor import run_doctor
+
+        return run_doctor(config)
 
     if getattr(args, "command", None) == "setup":
         from .wizard import run_wizard
