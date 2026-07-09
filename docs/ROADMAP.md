@@ -20,8 +20,9 @@ misleading level metrics), not the config file itself.
   Status section (shared `doctor.py`).
 - ✅ Earcons (wake chime / error tone) — shipped 2026-07-08.
 - ✅ Follow-up conversation mode — shipped 2026-07-08.
-- Wizard transcription-test section (exam finding: STT is the one stage
-  the wizard never exercises; would also pre-warm the Moonshine cache).
+- ✅ Wizard transcription-test section — shipped 2026-07-08: records one
+  utterance, shows the transcript + timings, and downloads the Moonshine
+  model straight into the service's cache location ({data_dir}/cache).
 
 ## V2 — configuration & integration (architecture agreed 2026-07-07)
 

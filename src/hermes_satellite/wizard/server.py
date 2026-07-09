@@ -15,6 +15,9 @@ Endpoints (all require the one-time token via ``?token=`` or
   POST /api/wake/config       {threshold}
   GET  /api/voices            downloaded + catalog voices
   POST /api/voices/preview    {name, speaker_id, length_scale, text}
+  POST /api/stt/prepare       load/download the STT model (into the
+                              service's cache location)
+  POST /api/stt/test          capture one utterance and transcribe it
   GET  /api/pending           accumulated changes
   GET  /api/behavior          streaming / follow-up / earcon settings
   POST /api/behavior/config   any subset of the /api/behavior fields
@@ -84,6 +87,30 @@ def _ensure_voices_dir(config) -> None:
                 f"sudo mkdir -p {path} && sudo chown -R {user} {data_dir}"
             )
     logger.info("created %s (owned by %s) via sudo", path, user)
+
+
+def _ensure_stt_cache(config) -> None:
+    """Point model downloads at the service's cache location.
+
+    The deployed daemon runs with ``XDG_CACHE_HOME={data_dir}/cache`` (set in
+    the systemd unit); the wizard adopts the same target so a Moonshine model
+    downloaded by the Transcription test is already in place for the service.
+    (Fresh-install gap: warming ``~/.cache`` here helped nobody.) Falls back
+    silently to the default cache when the data dir isn't writable — an
+    interactive clone still works.
+    """
+    import os
+
+    if os.environ.get("XDG_CACHE_HOME"):
+        return
+    target = Path(config.data_dir) / "cache"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+    if os.access(target, os.W_OK):
+        os.environ["XDG_CACHE_HOME"] = str(target)
+        logger.info("model cache -> %s (service location)", target)
 
 
 def _preload_heavy_modules() -> None:
@@ -241,6 +268,7 @@ class WizardState:
         self.wake.on_listening = lambda: self._led("idle")
         self.wake.on_stopped = lambda: self._led("off")
         self._tts_cache: dict = {}
+        self._stt_engine = None
 
     def _led(self, name: str) -> None:
         try:
@@ -512,6 +540,10 @@ def _make_handler(state: WizardState):
                     self._json(mixer.store())
                 elif route == "/api/voices/preview":
                     self._preview(body)
+                elif route == "/api/stt/prepare":
+                    self._stt_prepare()
+                elif route == "/api/stt/test":
+                    self._stt_test()
                 elif route == "/api/hermes/test":
                     self._hermes_test(body)
                 elif route == "/api/behavior/config":
@@ -633,6 +665,69 @@ def _make_handler(state: WizardState):
             self._json({"ok": True, "sample_rate": tts.sample_rate,
                         "downloaded": not was_downloaded,
                         "elapsed": elapsed})
+
+        def _stt_prepare(self):
+            """Load (and on first use download) the STT model. Split from the
+            test itself so the page can tell the user when to start talking —
+            a Pi takes seconds to load the model, a fresh install a minute to
+            download it, and people speak too early."""
+            state.meter.stop()
+            state.wake.stop()
+            _ensure_stt_cache(state.config)
+            started = time.monotonic()
+            downloaded = False
+            if state._stt_engine is None:
+                from ..stt import build_stt
+
+                engine = build_stt(state.config)
+                with _heavy_lock:
+                    # Force the lazy model load with a beat of silence.
+                    engine.transcribe(b"\x00\x00" * 1600)
+                state._stt_engine = engine
+                downloaded = time.monotonic() - started > 10
+            self._json({"ok": True, "downloaded": downloaded,
+                        "elapsed": round(time.monotonic() - started, 1)})
+
+        def _stt_test(self):
+            if state._stt_engine is None:
+                return self._json({"error": "prepare the model first"}, 400)
+            audio = self._capture_once()
+            seconds = round(
+                len(audio) / 2 / state.config.audio.sample_rate, 2
+            )
+            if not audio:
+                return self._json({"transcript": "",
+                                   "capture_seconds": 0, "stt_seconds": 0})
+            started = time.monotonic()
+            with _heavy_lock:
+                text = state._stt_engine.transcribe(audio)
+            self._json({"transcript": text, "capture_seconds": seconds,
+                        "stt_seconds": round(time.monotonic() - started, 2)})
+
+        def _capture_once(self) -> bytes:
+            """One VAD-gated utterance, on a mic we open and close ourselves
+            (a lingering stream would hold the device against the level meter
+            and wake test)."""
+            cfg = state.config
+            if cfg.audio.backend.lower() == "mock":
+                from ..audio import build_audio
+
+                source, _ = build_audio(cfg)
+                return source.capture_utterance(lambda: False)
+            from ..audio.alsa_backend import AlsaAudioSource
+            from ..audio.mic import MicStream
+
+            mic = MicStream(sample_rate=cfg.audio.sample_rate,
+                            device=cfg.audio.input_device,
+                            channels=cfg.audio.input_channels)
+            state._led("idle")
+            try:
+                return AlsaAudioSource(cfg.audio, mic=mic).capture_utterance(
+                    lambda: False
+                )
+            finally:
+                mic.close()
+                state._led("off")
 
         def _mqtt_test(self, body):
             import paho.mqtt.client as paho

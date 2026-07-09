@@ -84,7 +84,17 @@ behind your back.</p>
      detections <b id="wd">0</b> <span id="werr" class="bad"></span></p>
 </section>
 
-<h2>5 · Voice</h2>
+<h2>5 · Transcription</h2>
+<section>
+  <p class="muted">Exercises the same on-device speech-to-text the daemon
+  uses — and downloads its model to the right place on first run (can take
+  a minute; wait for the prompt before talking).</p>
+  <button onclick="sttTest()">Test transcription</button>
+  <b id="sstat" class="muted"></b>
+  <p>heard: <b id="stext">–</b> <span id="stime" class="muted"></span></p>
+</section>
+
+<h2>6 · Voice</h2>
 <section>
   <label>Voice <select id="voice"></select></label>
   <label>Speaker <input id="spk" type="number" style="width:8rem"
@@ -97,7 +107,7 @@ behind your back.</p>
   <span id="vres" class="muted"></span>
 </section>
 
-<h2>6 · Hermes</h2>
+<h2>7 · Hermes</h2>
 <section>
   <label>Host <input id="hh" size="14"></label>
   <label>Port <input id="hp" size="5"></label>
@@ -107,7 +117,7 @@ behind your back.</p>
   <p id="hres"></p>
 </section>
 
-<h2>7 · Conversation &amp; sounds</h2>
+<h2>8 · Conversation &amp; sounds</h2>
 <section>
   <label><input id="bs" type="checkbox" onchange="behavior({stream: this.checked})">
     Streamed replies — start speaking before the full answer has arrived</label><br>
@@ -128,7 +138,7 @@ behind your back.</p>
       onchange="behavior({earcon_volume: this.value})"></label>
 </section>
 
-<h2>8 · Home Assistant (MQTT)</h2>
+<h2>9 · Home Assistant (MQTT)</h2>
 <section>
   <p class="muted">Optional: the satellite appears in Home Assistant with a
   mute switch, volume/threshold sliders, voice select and a wake-word event —
@@ -147,7 +157,7 @@ behind your back.</p>
   <p class="muted">Device will appear in HA as <b id="mid"></b>.</p>
 </section>
 
-<h2>9 · Review &amp; save</h2>
+<h2>10 · Review &amp; save</h2>
 <section>
   <pre id="pending">(no changes yet)</pre>
   <button onclick="save()">Save configuration</button>
@@ -287,6 +297,22 @@ function wakeStop() {
   post("/api/wake/stop");
   clearInterval(wakeTimer);
   document.getElementById("wstat").textContent = "stopped";
+}
+function sttTest() {
+  const stat = document.getElementById("sstat");
+  const text = document.getElementById("stext");
+  stat.textContent = "preparing model… (first run downloads it — up to a minute)";
+  post("/api/stt/prepare").then(p => {
+    if (p.error) { stat.textContent = "failed: " + p.error; return; }
+    stat.textContent = "● listening — speak a sentence now";
+    return post("/api/stt/test").then(r => {
+      stat.textContent = "";
+      if (r.error) { text.textContent = "failed: " + r.error; return; }
+      text.textContent = r.transcript || "(nothing heard — mic level ok?)";
+      document.getElementById("stime").textContent = r.transcript
+        ? `(${r.capture_seconds}s of speech, transcribed in ${r.stt_seconds}s)` : "";
+    });
+  });
 }
 let voiceSpeakers = {};
 function updateSpeakerField() {

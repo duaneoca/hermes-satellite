@@ -50,16 +50,21 @@ open**.
    the page shows "starting" until scoring actually begins, and the
    HAT LEDs light in the listening color while the test is live —
    don't say the phrase until you see them.
-5. **Voice** — full catalog + downloaded voices, on-device preview with
+5. **Transcription** — record one utterance and see what the on-device
+   STT heard, with capture/transcribe timings. First use downloads the
+   Moonshine model **into the service's cache location**
+   (`{data_dir}/cache`), so a wizard-first install needs no separate
+   pre-seed step.
+6. **Voice** — full catalog + downloaded voices, on-device preview with
    speaker/pace knobs (downloads on demand).
-6. **Hermes** — health + authenticated round-trip chat test.
-7. **Conversation & sounds** — streamed replies (speak while the rest of
+7. **Hermes** — health + authenticated round-trip chat test.
+8. **Conversation & sounds** — streamed replies (speak while the rest of
    the answer is still arriving), follow-up mode (window length + max
    turns per conversation), and earcons (enable + volume).
-8. **Home Assistant (MQTT)** — enable toggle, broker settings with a
+9. **Home Assistant (MQTT)** — enable toggle, broker settings with a
    masked password (kept in `secrets.env`), and a live broker connection
    test that distinguishes unreachable / auth-refused / connected.
-9. **Review & save** — collected changes are listed; **Save
+10. **Review & save** — collected changes are listed; **Save
    configuration** first copies your current config to a timestamped
    backup (`config.yaml.bak-YYYYMMDD-HHMMSS`) and then updates
    `config.yaml` in place. **Credentials are stripped from the yaml and
@@ -68,5 +73,5 @@ open**.
    deployed. Restart the daemon to apply. (Comments in the config file
    are not preserved by the rewrite — they live on in the backup.)
 
-Changes made in sections 2–7 apply to the wizard's live session immediately
+Changes made in sections 2–8 apply to the wizard's live session immediately
 (so previews/tests use them), and land in the review file at the end.

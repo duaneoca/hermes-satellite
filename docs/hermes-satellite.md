@@ -241,8 +241,10 @@ stays your user's and is unrelated to the deployed copy.
    (Add `HERMES_SESSION_KEY=...` to secrets.env if you prefer it out of the
    yaml too; it's a scoping label rather than a credential.)
 3. Data directory (the only place the service writes) — the Piper voice is
-   already here from the wizard; pre-seed the Moonshine STT model so first
-   start needs no download. **Note:** `~/.cache/moonshine_voice` only exists
+   already here from the wizard, and **if you ran the wizard's Transcription
+   test, so is the Moonshine model** (it downloads into `{data_dir}/cache`) —
+   then only the `chown` below is needed. Otherwise pre-seed the model so
+   first start needs no download. **Note:** `~/.cache/moonshine_voice` only exists
    if you ever ran the daemon interactively — on the wizard-first path it
    doesn't (the wizard doesn't exercise STT), so download straight into the
    service location:

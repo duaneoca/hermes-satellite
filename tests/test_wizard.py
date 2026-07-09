@@ -471,3 +471,70 @@ def test_page_has_conversation_section(wizard):
     for element_id in ("bs", "bf", "bw", "bt", "be", "bv"):
         assert f'id="{element_id}"' in html
     assert "/api/behavior" in html
+
+
+def test_stt_prepare_and_test_flow(wizard, monkeypatch):
+    """Prepare loads/caches the engine (into the service cache location),
+    test captures one utterance and transcribes it."""
+    import hermes_satellite.stt as stt_pkg
+
+    class FakeEngine:
+        def __init__(self):
+            self.calls = []
+
+        def transcribe(self, audio):
+            self.calls.append(audio)
+            return "hello there" if len(audio) > 4000 else ""
+
+    engine = FakeEngine()
+    monkeypatch.setattr(stt_pkg, "build_stt",
+                        lambda config, demo=False: engine)
+    state, base = wizard  # fixture config uses audio.backend: mock
+
+    code, p = _post(f"{base}/api/stt/prepare?token={state.token}")
+    assert p["ok"] is True
+    assert engine.calls  # model force-loaded with silence
+    assert state._stt_engine is engine
+
+    code, r = _post(f"{base}/api/stt/test?token={state.token}")
+    assert r["transcript"] == "hello there"
+    assert r["capture_seconds"] > 0
+    # engine is cached: prepare again must not rebuild
+    monkeypatch.setattr(stt_pkg, "build_stt",
+                        lambda config, demo=False: (_ for _ in ()).throw(
+                            AssertionError("rebuilt")))
+    _, p2 = _post(f"{base}/api/stt/prepare?token={state.token}")
+    assert p2["ok"] is True
+
+
+def test_stt_test_without_prepare_is_an_error(wizard):
+    state, base = wizard
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _post(f"{base}/api/stt/test?token={state.token}")
+    assert e.value.code == 400
+
+
+def test_ensure_stt_cache_targets_service_location(tmp_path, monkeypatch):
+    import os
+    import types
+    from hermes_satellite.wizard.server import _ensure_stt_cache
+
+    cfg = types.SimpleNamespace(data_dir=str(tmp_path / "data"))
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    _ensure_stt_cache(cfg)
+    assert os.environ["XDG_CACHE_HOME"] == str(tmp_path / "data" / "cache")
+    assert (tmp_path / "data" / "cache").is_dir()
+
+    # an already-set XDG_CACHE_HOME is respected
+    monkeypatch.setenv("XDG_CACHE_HOME", "/somewhere/else")
+    _ensure_stt_cache(cfg)
+    assert os.environ["XDG_CACHE_HOME"] == "/somewhere/else"
+
+
+def test_page_has_transcription_section(wizard):
+    state, base = wizard
+    with urllib.request.urlopen(f"{base}/?token={state.token}") as r:
+        html = r.read().decode()
+    assert "Transcription" in html
+    assert "/api/stt/prepare" in html
+    assert "/api/stt/test" in html
