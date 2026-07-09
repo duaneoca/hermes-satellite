@@ -145,9 +145,27 @@ body and parses the reply.
 - Rotate by editing the server's `.env` + `hermes gateway restart`, then
   updating `secrets.env` on each satellite.
 
-## Future: streaming
+## Streaming
 
-The client is structured so a streaming path (`stream: true`, Server‑Sent
-Events, piping sentence chunks to Piper as they arrive) can be added without
-changing callers. It is intentionally out of scope for this first
-implementation.
+`send_stream()` posts with `stream: true` and yields reply text deltas from
+the Server-Sent Events response (`data:` lines, `[DONE]` terminator). The
+pipeline chunks deltas into sentences (`iter_sentences`) and synthesizes
+ahead while the previous sentence plays, so first audio arrives within
+seconds of the reply starting. Enabled by default (`hermes.stream: true`).
+
+Timeouts: `hermes.timeout` bounds the TCP connect (and the whole
+non-streaming request); `hermes.stream_read_timeout` (default 300 s) bounds
+the quiet gap between stream reads — deliberately long, because the agent
+goes silent while it runs tools mid-turn.
+
+## Duplicate-turn safety
+
+The client never re-sends a message Hermes may already have. The streaming
+path falls back to a non-streaming request **only** on
+`HermesStreamNotStarted` — a connection failure or an immediate non-200
+rejection, i.e. no turn started. A read timeout or a broken stream raises
+`HermesError` instead of retrying. Rationale (field incident): a
+quiet-stream timeout used to trigger the fallback, which re-POSTed the same
+message mid-turn; the server's `busy_input_mode: interrupt` treated the
+duplicate as new input and killed the in-flight turn, cascading into
+retries, security-gate blocks, and inconsistent tool results.
