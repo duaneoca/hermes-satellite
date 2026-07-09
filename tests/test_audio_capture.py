@@ -99,3 +99,38 @@ def test_mute_mid_capture_stops_recording():
     src, _ = _source([True])  # immediate speech
     audio = src.capture_utterance(muted)
     assert audio  # what was captured before the mute is returned
+
+
+def test_sink_play_blocks_for_audio_duration(monkeypatch):
+    """Regression: write() returns once frames are buffered and closing an
+    active stream discards the rest — play() returned while sound was still
+    leaving the speaker, so the mic flush ran too early and the capture VAD
+    opened on our own earcon (follow-up windows died after ~1 s)."""
+    import sys
+    import time
+    import types as t
+
+    class FakeOut:
+        latency = 0.01
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def write(self, pcm):  # instant, like a large host buffer
+            pass
+
+    sd = t.ModuleType("sounddevice")
+    sd.RawOutputStream = lambda **kw: FakeOut()
+    monkeypatch.setitem(sys.modules, "sounddevice", sd)
+
+    from hermes_satellite.audio.alsa_backend import AlsaAudioSink
+    from hermes_satellite.config import AudioConfig
+
+    sink = AlsaAudioSink(AudioConfig())
+    pcm = b"\x00\x00" * 1600  # 100 ms at 16 kHz
+    started = time.monotonic()
+    sink.play(pcm, 16000)
+    assert time.monotonic() - started >= 0.1

@@ -124,8 +124,8 @@ class AlsaAudioSink(AudioSink):
         import sounddevice as sd  # lazy
 
         rate = sample_rate or self._config.sample_rate
-        # Context manager starts the stream and, on exit, drains pending
-        # buffers before closing — playback is complete when this returns.
+        duration = len(pcm) / 2 / rate
+        started = time.monotonic()
         with sd.RawOutputStream(
             samplerate=rate,
             device=self._config.output_device,
@@ -133,3 +133,12 @@ class AlsaAudioSink(AudioSink):
             dtype="int16",
         ) as out:
             out.write(pcm)
+            # write() returns once frames are *buffered*, and closing an
+            # active stream discards whatever hasn't played yet — so without
+            # this hold, short sounds (earcons) get cut off and play() returns
+            # while audio is still leaving the speaker. The mic is 5 cm away:
+            # capture must not arm while we're still audible, or the VAD
+            # opens on our own output.
+            latency = out.latency if isinstance(out.latency, float) else 0.0
+            remaining = started + duration - time.monotonic()
+            time.sleep(max(0.0, remaining) + latency)

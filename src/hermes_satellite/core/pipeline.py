@@ -36,6 +36,12 @@ from .speech_text import iter_sentences, make_speakable
 
 logger = logging.getLogger(__name__)
 
+# Pause between our last playback (chime/reply) and the mic flush that
+# precedes capture. The flush only discards what has already reached the
+# input buffer; sound still traveling speaker -> room -> mic -> ALSA when
+# we flush would land *after* it and trip the capture VAD.
+MIC_SETTLE_S = 0.2
+
 
 def _chain_first(first, rest):
     """Yield ``first`` then everything from ``rest``."""
@@ -79,6 +85,13 @@ class Pipeline:
     def _chime(self, cue: str) -> None:
         if self.earcons is not None:
             self.earcons.play(cue)
+
+    def _flush_mic(self) -> None:
+        """Discard buffered mic audio once the room has gone quiet."""
+        if self._mic_flush is None:
+            return
+        time.sleep(MIC_SETTLE_S)
+        self._mic_flush()
 
     def _handle_turn(self, onset_timeout: Optional[float]) -> bool:
         """Capture -> STT -> Hermes -> TTS -> play one turn.
@@ -199,8 +212,7 @@ class Pipeline:
         self._chime("wake")
         # Drop any buffered audio (wake-word tail + the chime's own echo) so
         # it can't false-trigger the capture VAD.
-        if self._mic_flush is not None:
-            self._mic_flush()
+        self._flush_mic()
 
         onset: Optional[float] = None  # first turn: default speech timeout
         turns = 0
@@ -218,8 +230,7 @@ class Pipeline:
             # Re-open for a follow-up turn as a virtual wake (IDLE -> WAKE).
             self._chime("listening")
             self.sm.dispatch(Event.WAKE_DETECTED)
-            if self._mic_flush is not None:
-                self._mic_flush()
+            self._flush_mic()
             onset = self.conversation.follow_up_seconds
 
     def run_forever(self) -> None:

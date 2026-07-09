@@ -123,15 +123,22 @@ Capture (`audio/alsa_backend.py`) is VAD-gated by webrtcvad in 30 ms frames:
 wait up to `speech_timeout_seconds` for onset (keeping a 300 ms pre-roll so the
 first syllable isn't clipped), then record until `silence_ms` of trailing
 silence or `max_record_seconds`. Onset requires **90 ms of consecutive speech**
-— a single loud frame is ignored, because the WM8960's output-stage pop
-(~15 ms, full scale) otherwise reads as speech and opens recording on silence
-(the symptom: a follow-up window that closes after ~1 s instead of staying
-open). While muted, capture returns empty and the wake loop drains frames
-without processing them.
+— a single loud frame is ignored, so clicks and the WM8960's output-stage pop
+(~15 ms, full scale) can't open recording on their own. While muted, capture
+returns empty and the wake loop drains frames without processing them.
 
 Playback opens the output stream at the TTS engine's native rate
 (`TTSEngine.sample_rate` — e.g. a Piper voice's 22050 Hz), so no resampling is
-needed.
+needed. `play()` holds until the audio has actually left the DAC —
+PortAudio's `write()` returns once frames are merely *buffered*, and closing
+an active stream discards the rest, which used to cut earcons short and,
+worse, return control while the speaker was still audible. Because the mics
+sit 5 cm from the speaker, the pipeline also waits a short settle
+(`MIC_SETTLE_S`, 200 ms) after any playback before flushing the mic and
+arming capture; without it, our own chime landed in the mic buffer *after*
+the flush and the capture VAD opened on it — the field symptom was a
+follow-up window that closed after ~1 s (`silence_ms`) instead of staying
+open for `follow_up_seconds`.
 
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).

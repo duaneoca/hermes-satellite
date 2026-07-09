@@ -1,9 +1,18 @@
 """Pipeline orchestration: earcons, follow-up mode, virtual-wake transitions."""
 
+import pytest
+
 from hermes_satellite.config import ConversationConfig
+from hermes_satellite.core import pipeline as pipeline_mod
 from hermes_satellite.core.events import StateMachine
 from hermes_satellite.core.states import State
 from hermes_satellite.core.pipeline import Pipeline
+
+
+@pytest.fixture(autouse=True)
+def _no_settle_delay(monkeypatch):
+    """The pre-flush settle pause is dead time in tests."""
+    monkeypatch.setattr(pipeline_mod, "MIC_SETTLE_S", 0.0)
 
 
 class FakeWake:
