@@ -244,7 +244,11 @@ pip install --upgrade pip setuptools wheel   # REQUIRED on Raspberry Pi OS:
     # fails with: 'File "setup.py" not found ... editable mode currently
     # requires a setup.py based build.'
 pip install -e ".[pi4]"
-cp config.example.yaml config.yaml     # set hardware_profile: pi4-respeaker-v1
+cp config.example.yaml config.yaml
+sed -i 's/^hardware_profile:.*/hardware_profile: pi4-respeaker-v1/' config.yaml
+    # (the example ships with the pi5 profile — the sed makes this board's
+    #  profile explicit; the wizard Status section and 'doctor' both flag a
+    #  board/profile mismatch)
 # LED + button smoke test (audio/agent still mock):
 hermes-satellite --demo --config config.yaml
 ```

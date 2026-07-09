@@ -617,3 +617,43 @@ def test_page_has_wake_model_picker(wizard):
         html = r.read().decode()
     assert 'id="wwm"' in html and 'id="wwp"' in html
     assert "/api/wake/model" in html
+
+
+def test_stt_capture_uses_generous_onset_window(wizard, monkeypatch):
+    """Field report (exam #3): the default 5 s speech-onset window forced
+    people to blurt — the wizard's test must allow reading the prompt."""
+    import hermes_satellite.audio.alsa_backend as alsa_mod
+    import hermes_satellite.audio.mic as mic_mod
+
+    seen = {}
+
+    class FakeSource:
+        def __init__(self, cfg, mic=None):
+            pass
+
+        def capture_utterance(self, is_muted, onset_timeout=None):
+            seen["onset"] = onset_timeout
+            return b"\x00\x00" * 8000
+
+    class FakeMic:
+        def __init__(self, **kw):
+            pass
+
+        def close(self):
+            seen["closed"] = True
+
+    monkeypatch.setattr(alsa_mod, "AlsaAudioSource", FakeSource)
+    monkeypatch.setattr(mic_mod, "MicStream", FakeMic)
+
+    state, base = wizard
+    state.config.audio.backend = "alsa"
+
+    class FakeEngine:
+        def transcribe(self, audio):
+            return "ten four"
+
+    state._stt_engine = FakeEngine()
+    _, r = _post(f"{base}/api/stt/test?token={state.token}")
+    assert r["transcript"] == "ten four"
+    assert seen["onset"] >= 10
+    assert seen["closed"] is True

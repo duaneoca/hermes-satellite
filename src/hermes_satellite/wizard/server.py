@@ -786,8 +786,11 @@ def _make_handler(state: WizardState):
                             channels=cfg.audio.input_channels)
             state._led("idle")
             try:
+                # A generous onset window: unlike the daemon's post-wake
+                # capture, the user here is reading instructions first
+                # (field report: the default 5 s forced people to blurt).
                 return AlsaAudioSource(cfg.audio, mic=mic).capture_utterance(
-                    lambda: False
+                    lambda: False, onset_timeout=15.0
                 )
             finally:
                 mic.close()

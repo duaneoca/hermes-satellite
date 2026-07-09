@@ -117,7 +117,9 @@ python -c 'import sys; sys.exit(sys.version_info >= (3,12))' || \
 pip install --upgrade pip setuptools wheel   # Raspberry Pi OS pip is too old
     # for pyproject.toml editable installs ('File "setup.py" not found ...')
 pip install -e ".[pi5]"
-cp config.example.yaml config.yaml     # hardware_profile: pi5-respeaker-v2
+cp config.example.yaml config.yaml
+sed -i 's/^hardware_profile:.*/hardware_profile: pi5-respeaker-v2/' config.yaml
+    # (already the example's default — the sed just makes it explicit)
 hermes-satellite --demo --config config.yaml   # LED + button smoke test
 ```
 

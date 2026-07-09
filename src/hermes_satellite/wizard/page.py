@@ -338,7 +338,7 @@ function sttTest() {
   stat.textContent = "preparing model… (first run downloads it — up to a minute)";
   post("/api/stt/prepare").then(p => {
     if (p.error) { stat.textContent = "failed: " + p.error; return; }
-    stat.textContent = "● listening — speak a sentence now";
+    stat.textContent = "● listening — speak a sentence (you have ~15 seconds to start)";
     return post("/api/stt/test").then(r => {
       stat.textContent = "";
       if (r.error) { text.textContent = "failed: " + r.error; return; }
