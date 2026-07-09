@@ -148,7 +148,11 @@ body and parses the reply.
 ## Streaming
 
 `send_stream()` posts with `stream: true` and yields reply text deltas from
-the Server-Sent Events response (`data:` lines, `[DONE]` terminator). The
+the Server-Sent Events response (`data:` lines, `[DONE]` terminator).
+Hermes interleaves **agent-activity events** (tool calls, status — chunks
+without a `choices` key, e.g. `{"tool": "browser_navigate", ...}`) with the
+completion chunks; the client skips them (debug-logged), along with any
+unparseable line. The
 pipeline chunks deltas into sentences (`iter_sentences`) and synthesizes
 ahead while the previous sentence plays, so first audio arrives within
 seconds of the reply starting. Enabled by default (`hermes.stream: true`).
@@ -164,8 +168,10 @@ The client never re-sends a message Hermes may already have. The streaming
 path falls back to a non-streaming request **only** on
 `HermesStreamNotStarted` — a connection failure or an immediate non-200
 rejection, i.e. no turn started. A read timeout or a broken stream raises
-`HermesError` instead of retrying. Rationale (field incident): a
-quiet-stream timeout used to trigger the fallback, which re-POSTed the same
-message mid-turn; the server's `busy_input_mode: interrupt` treated the
-duplicate as new input and killed the in-flight turn, cascading into
-retries, security-gate blocks, and inconsistent tool results.
+`HermesError` instead of retrying. Rationale (field incident): any failure
+before the first sentence used to trigger the fallback — in practice the
+parser choking on Hermes's tool-activity chunks, deterministically on every
+tool-using turn — which re-POSTed the same message mid-turn; the server's
+`busy_input_mode: interrupt` treated the duplicate as new input and killed
+the in-flight turn, cascading into retries, security-gate blocks, and
+inconsistent tool results.

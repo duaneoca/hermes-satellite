@@ -141,13 +141,41 @@ def test_send_stream_http_error_raises_before_iteration():
 
 
 @responses.activate
-def test_send_stream_bad_chunk_raises_mid_iteration():
-    responses.add(responses.POST, URL, body="data: {not json}\n\n",
+def test_send_stream_skips_agent_activity_events():
+    """Field incident: Hermes interleaves tool-activity events (no 'choices')
+    with completion chunks — every tool-using turn died on the first one."""
+    import json as _j
+    body = "\n".join([
+        'data: ' + _j.dumps({"choices": [{"delta": {"content": "Checking. "}}]}),
+        "",
+        'data: ' + _j.dumps({"tool": "browser_navigate", "emoji": "x",
+                             "label": "https://wttr.in/Oakland,CA"}),
+        "",
+        "data: {not json}",   # unparseable line: skipped too, not fatal
+        "",
+        'data: ' + _j.dumps({"choices": [{"delta": {"content": "It is 71F."}}]}),
+        "",
+        "data: [DONE]",
+    ])
+    responses.add(responses.POST, URL, body=body,
                   status=200, content_type="text/event-stream")
     client = HermesClient(_config())
-    gen = client.send_stream("hi", session_key="d")
-    with pytest.raises(HermesError, match="stream chunk"):
-        list(gen)
+    assert list(client.send_stream("hi", session_key="d")) == \
+        ["Checking. ", "It is 71F."]
+
+
+@responses.activate
+def test_send_stream_only_activity_events_yields_nothing():
+    import json as _j
+    body = "\n".join([
+        'data: ' + _j.dumps({"tool": "terminal", "label": "curl"}),
+        "",
+        "data: [DONE]",
+    ])
+    responses.add(responses.POST, URL, body=body,
+                  status=200, content_type="text/event-stream")
+    client = HermesClient(_config())
+    assert list(client.send_stream("hi", session_key="d")) == []
 
 
 def test_stream_connection_error_is_retryable(monkeypatch):

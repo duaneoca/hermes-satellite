@@ -141,11 +141,27 @@ class HermesClient(AgentClient):
                         return
                     try:
                         chunk = _json.loads(data)
-                        delta = chunk["choices"][0].get("delta", {})
-                        content = delta.get("content")
-                    except (ValueError, KeyError, IndexError, TypeError) as exc:
-                        raise HermesError(
-                            f"Unexpected stream chunk: {data[:120]}") from exc
+                    except ValueError:
+                        logger.warning(
+                            "skipping unparseable stream line: %.120s", data)
+                        continue
+                    choices = (chunk.get("choices")
+                               if isinstance(chunk, dict) else None)
+                    if not choices:
+                        # Hermes interleaves agent-activity events (tool
+                        # calls, status) with the completion chunks — e.g.
+                        # {"tool": "browser_navigate", ...}. Not reply text;
+                        # skip. (Field incident: treating these as fatal made
+                        # every tool-using turn abort mid-stream.)
+                        logger.debug("stream event (skipped): %.120s", data)
+                        continue
+                    try:
+                        content = (choices[0].get("delta") or {}).get("content")
+                    except (AttributeError, IndexError, TypeError):
+                        logger.warning(
+                            "skipping malformed completion chunk: %.120s",
+                            data)
+                        continue
                     if content:
                         yield content
             except requests.RequestException as exc:
