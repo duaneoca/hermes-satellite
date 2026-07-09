@@ -148,3 +148,89 @@ def test_send_stream_bad_chunk_raises_mid_iteration():
     gen = client.send_stream("hi", session_key="d")
     with pytest.raises(HermesError, match="stream chunk"):
         list(gen)
+
+
+def test_stream_connection_error_is_retryable(monkeypatch):
+    """Connection failures never started a turn -> HermesStreamNotStarted."""
+    import requests
+    from hermes_satellite.config import HermesConfig
+    from hermes_satellite.hermes.base import HermesStreamNotStarted
+    from hermes_satellite.hermes.client import HermesClient
+
+    class BoomSession:
+        def post(self, *a, **k):
+            raise requests.ConnectionError("refused")
+
+    client = HermesClient(HermesConfig(), session=BoomSession())
+    with pytest.raises(HermesStreamNotStarted):
+        client.send_stream("hi", "key")
+
+
+def test_stream_rejection_is_retryable():
+    """A non-200 rejected the request outright -> safe to retry blocking."""
+    from hermes_satellite.config import HermesConfig
+    from hermes_satellite.hermes.base import HermesStreamNotStarted
+    from hermes_satellite.hermes.client import HermesClient
+
+    class Resp:
+        status_code = 400
+        text = "streaming unsupported"
+
+        def close(self):
+            pass
+
+    class Session:
+        def post(self, *a, **k):
+            return Resp()
+
+    client = HermesClient(HermesConfig(), session=Session())
+    with pytest.raises(HermesStreamNotStarted):
+        client.send_stream("hi", "key")
+
+
+def test_stream_read_timeout_is_not_retryable():
+    """Regression (field incident): a read timeout means Hermes already has
+    the message — must NOT be the retryable class, or the caller re-sends
+    and creates a duplicate turn."""
+    import requests
+    from hermes_satellite.config import HermesConfig
+    from hermes_satellite.hermes.base import HermesError, HermesStreamNotStarted
+    from hermes_satellite.hermes.client import HermesClient
+
+    class Session:
+        def post(self, *a, **k):
+            raise requests.ReadTimeout("quiet")
+
+    client = HermesClient(HermesConfig(), session=Session())
+    with pytest.raises(HermesError) as e:
+        client.send_stream("hi", "key")
+    assert not isinstance(e.value, HermesStreamNotStarted)
+
+
+def test_stream_uses_patient_read_timeout():
+    """Streaming requests pass (connect, stream_read_timeout) — agent tool
+    phases are quiet and must not be cut off at the blocking timeout."""
+    from hermes_satellite.config import HermesConfig
+    from hermes_satellite.hermes.client import HermesClient
+
+    seen = {}
+
+    class Resp:
+        status_code = 200
+
+        def iter_lines(self, decode_unicode=True):
+            yield 'data: {"choices":[{"delta":{"content":"hi"}}]}'
+            yield "data: [DONE]"
+
+        def close(self):
+            pass
+
+    class Session:
+        def post(self, *a, **k):
+            seen["timeout"] = k["timeout"]
+            return Resp()
+
+    cfg = HermesConfig(timeout=30.0, stream_read_timeout=300.0)
+    client = HermesClient(cfg, session=Session())
+    assert list(client.send_stream("hi", "key")) == ["hi"]
+    assert seen["timeout"] == (30.0, 300.0)

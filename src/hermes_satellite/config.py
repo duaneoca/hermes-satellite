@@ -86,6 +86,11 @@ class HermesConfig:
     # first audio in a few seconds instead of after the whole reply. Falls
     # back to non-streaming automatically if the stream can't start.
     stream: bool = True
+    # Max quiet gap on the stream before giving up. Deliberately long: an
+    # agent backend goes silent while it runs tools mid-turn, and giving up
+    # early cannot be retried — Hermes already has the message, so a re-send
+    # would start a duplicate turn.
+    stream_read_timeout: float = 300.0
 
 
 @dataclass

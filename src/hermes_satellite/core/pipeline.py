@@ -205,6 +205,8 @@ class Pipeline:
         import queue as _queue
         import threading as _threading
 
+        from ..hermes.base import HermesStreamNotStarted
+
         try:
             deltas = self.hermes.send_stream(text, self.session_key)
             sentences = iter_sentences(deltas)
@@ -213,8 +215,14 @@ class Pipeline:
             except StopIteration:
                 logger.info("hermes reply: (empty stream)")
                 return False
-        except Exception as exc:
-            logger.warning("stream unavailable (%s); falling back", exc)
+        except HermesStreamNotStarted as exc:
+            # No turn started on Hermes — the one case where re-sending is
+            # safe. Any other failure means Hermes already has the message:
+            # re-sending would start a duplicate turn (field incident: the
+            # duplicate hit busy_input_mode:interrupt and killed the
+            # in-flight turn), so those propagate to the error path instead.
+            logger.warning("stream not started (%s); retrying non-streaming",
+                           exc)
             return self._blocking_reply(text)
 
         self.sm.dispatch(Event.RESPONSE_READY)

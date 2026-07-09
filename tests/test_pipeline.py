@@ -241,10 +241,13 @@ def test_streaming_speaks_sentence_by_sentence():
     assert sm.state is State.IDLE
 
 
-def test_streaming_setup_failure_falls_back_to_blocking():
+def test_stream_not_started_falls_back_to_blocking():
+    """Fallback is allowed ONLY when no turn started on Hermes."""
+    from hermes_satellite.hermes.base import HermesStreamNotStarted
+
     class NoStream(FakeHermes):
         def send_stream(self, text, session_key):
-            raise RuntimeError("SSE not supported")
+            raise HermesStreamNotStarted("HTTP 400: streaming unsupported")
 
     hermes = NoStream()
     pipe, sm, sink = _streaming_pipeline(hermes)
@@ -252,6 +255,34 @@ def test_streaming_setup_failure_falls_back_to_blocking():
     assert hermes.calls  # blocking send() was used
     assert sink.plays == 1
     assert sm.state is State.IDLE
+
+
+def test_stream_timeout_does_not_resend(caplog):
+    """Regression (field incident): a quiet-stream timeout used to fall back
+    to a blocking send of the SAME message — Hermes already had it, and the
+    duplicate tripped busy_input_mode:interrupt, killing the in-flight turn.
+    Failures after the request was delivered must NOT re-send."""
+    from hermes_satellite.hermes.base import HermesError
+
+    class QuietStream(FakeHermes):
+        def __init__(self):
+            super().__init__()
+            self.blocking_sends = 0
+
+        def send_stream(self, text, session_key):
+            raise HermesError("Hermes stream went quiet for 300s")
+
+        def send(self, text, session_key):
+            self.blocking_sends += 1
+            return super().send(text, session_key)
+
+    hermes = QuietStream()
+    pipe, sm, sink = _streaming_pipeline(hermes)
+    import pytest as _p
+    with _p.raises(HermesError, match="quiet"):
+        pipe.run_cycle()
+    assert hermes.blocking_sends == 0   # the message was never re-sent
+    assert sink.plays == 0
 
 
 def test_streaming_midway_failure_errors_after_partial_speech():

@@ -15,7 +15,7 @@ from typing import Optional
 import requests
 
 from ..config import HermesConfig
-from .base import AgentClient, HermesError
+from .base import AgentClient, HermesError, HermesStreamNotStarted
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +88,18 @@ class HermesClient(AgentClient):
     def send_stream(self, text: str, session_key: str):
         """Yield reply text deltas as they arrive (SSE, ``stream: true``).
 
-        The configured ``timeout`` applies per-read in streaming mode — i.e.
-        it bounds the silence *between* chunks, not the total reply time,
-        which is the right semantics for a long-thinking agent. Raises
-        :class:`HermesError`; failures before the first delta are safe to
-        retry non-streaming.
+        Timeouts: ``timeout`` bounds the TCP connect; ``stream_read_timeout``
+        bounds the silence between reads — deliberately long, because an
+        agent backend goes quiet while it runs tools, and a "timeout" here
+        does NOT mean the turn failed.
+
+        Raises :class:`HermesStreamNotStarted` only when the request provably
+        never started a turn (connection failure, or the server rejected it
+        with a non-200) — the caller may then safely re-send non-streaming.
+        Every other failure raises :class:`HermesError`: Hermes already has
+        the message, and re-sending it would create a duplicate turn (field
+        incident: the duplicate tripped the server's busy_input_mode:
+        interrupt, killing the in-flight — and about to succeed — turn).
         """
         import json as _json
 
@@ -101,18 +108,28 @@ class HermesClient(AgentClient):
                 self._url,
                 json=self._payload(text, stream=True),
                 headers=self._headers(session_key),
-                timeout=self._cfg.timeout,
+                timeout=(self._cfg.timeout, self._cfg.stream_read_timeout),
                 stream=True,
             )
-        except requests.Timeout as exc:
+        except requests.ConnectTimeout as exc:
+            raise HermesStreamNotStarted(
+                f"could not connect to Hermes within {self._cfg.timeout}s"
+            ) from exc
+        except requests.Timeout as exc:  # request delivered; Hermes has it
             raise HermesError(
-                f"Hermes stream timed out after {self._cfg.timeout}s") from exc
+                "Hermes stream went quiet for "
+                f"{self._cfg.stream_read_timeout}s") from exc
+        except requests.ConnectionError as exc:
+            raise HermesStreamNotStarted(
+                f"Hermes connection failed: {exc}") from exc
         except requests.RequestException as exc:
             raise HermesError(f"Hermes stream failed: {exc}") from exc
         if resp.status_code != 200:
             body = resp.text[:200]
             resp.close()
-            raise HermesError(f"Hermes returned HTTP {resp.status_code}: {body}")
+            # Rejected outright (e.g. streaming unsupported): no turn started.
+            raise HermesStreamNotStarted(
+                f"Hermes returned HTTP {resp.status_code}: {body}")
 
         def deltas():
             try:
