@@ -140,6 +140,10 @@ behind your back.</p>
     Barge-in — saying the wake word while the assistant is speaking cuts
     the reply short and starts a new turn (works best at moderate
     speaker volume)</label><br>
+  <label class="muted">Stop-phrase model
+    <input id="bp" size="30" placeholder="(wake word barges by default)"
+      title="path to a custom-trained model, e.g. 'jarvis stop' — hearing it stops the reply and goes idle instead of opening a new turn; see docs/wakeword.md"
+      onchange="behavior({barge_model: this.value})"></label><br>
   <label><input id="be" type="checkbox" onchange="behavior({earcons: this.checked})">
     Sound cues — chime on wake, blip when the follow-up window opens,
     tone on error</label>
@@ -407,6 +411,7 @@ function loadBehavior() {
     document.getElementById("bw").value = b.follow_up_seconds;
     document.getElementById("bt").value = b.max_turns;
     document.getElementById("bb").checked = b.barge_in;
+    document.getElementById("bp").value = b.barge_model || "";
     document.getElementById("be").checked = b.earcons;
     document.getElementById("bv").value = b.earcon_volume;
   });

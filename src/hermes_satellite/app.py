@@ -78,6 +78,22 @@ class SatelliteApp:
                 channels=config.audio.input_channels,
             )
         wakeword = build_wakeword(config, demo=demo, mic=self._mic)
+        # Dedicated interrupt phrase ("jarvis stop"): a second detector on
+        # the shared mic, loaded with the custom-trained model.
+        barge_wakeword = None
+        conv = config.conversation
+        if conv.barge_in and conv.barge_model_path and not demo:
+            import dataclasses
+
+            barge_ww = dataclasses.replace(
+                config.wakeword, model_path=conv.barge_model_path)
+            if conv.barge_threshold is not None:
+                barge_ww = dataclasses.replace(
+                    barge_ww, threshold=conv.barge_threshold)
+            barge_wakeword = build_wakeword(
+                dataclasses.replace(config, wakeword=barge_ww),
+                demo=False, mic=self._mic,
+            )
         audio_source, audio_sink = build_audio(config, demo=demo, mic=self._mic)
         stt = build_stt(config, demo=demo)
         tts = build_tts(config, demo=demo)
@@ -103,6 +119,7 @@ class SatelliteApp:
             conversation=config.conversation,
             mic_flush=(self._mic.flush if self._mic is not None else None),
             stream_replies=config.hermes.stream,
+            barge_wakeword=barge_wakeword,
         )
 
     @classmethod

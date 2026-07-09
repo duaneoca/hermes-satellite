@@ -105,3 +105,20 @@ def iter_sentences(deltas):
     tail = (pending + " " + buffer).strip() if pending else buffer.strip()
     if tail:
         yield tail
+
+
+# Spoken commands that mean "end the conversation": after a barge-in or in a
+# follow-up window, these short-circuit the turn (no Hermes round-trip).
+# Exact-match against the normalized transcript, so ordinary sentences that
+# merely contain "stop" can't misfire.
+_STOP_PHRASES = frozenset({
+    "stop", "jarvis stop", "hey jarvis stop", "stop talking", "stop it",
+    "cancel", "cancel that", "never mind", "nevermind", "be quiet", "shut up",
+    "thats all",
+})
+
+
+def is_stop_command(text: str) -> bool:
+    """True when the transcript is a stop command and nothing else."""
+    norm = re.sub(r"[^a-z ]+", " ", text.lower().replace("'", ""))
+    return " ".join(norm.split()) in _STOP_PHRASES

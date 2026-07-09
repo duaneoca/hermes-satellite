@@ -107,6 +107,12 @@ Use the [automatic training Colab](https://github.com/dscripka/openWakeWord#trai
 
 Then: `model_path: /var/lib/hermes-satellite/hey_hermes.onnx`.
 
+The same recipe trains a **dedicated interrupt phrase** — e.g. train
+"jarvis stop" and set `conversation.barge_model_path:
+/var/lib/hermes-satellite/jarvis_stop.onnx` (with `conversation.barge_in:
+true`): hearing it while the assistant speaks stops the reply and returns
+to idle. See the barge-in section of hermes-satellite.md.
+
 ### 5. The strongest lever: a personal verifier
 
 openWakeWord can train a second-stage classifier on **your own voice** that

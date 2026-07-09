@@ -171,6 +171,15 @@ Three conversational conveniences layer on the pipeline (`core/pipeline.py`):
   competes with the assistant's own voice — moderate playback volume helps,
   and there is no echo cancellation. In streaming mode a barge also tells
   the synth-ahead thread to abandon the rest of the reply.
+  Two stop-flavored refinements: `conversation.barge_model_path` points at a
+  custom-trained model for a dedicated interrupt phrase (e.g. "jarvis stop",
+  trained per [wakeword.md](wakeword.md) §4; threshold via
+  `barge_threshold`) — when set, hearing it **stops the reply and returns to
+  idle** instead of opening a new turn. And independent of barge-in, a
+  captured transcript that is exactly a stop command ("stop", "never mind",
+  "cancel", …) ends the conversation with a confirmation blip instead of a
+  Hermes round-trip — so "hey jarvis … stop" already silences a reply
+  mid-follow-up with no custom model at all.
 
 ## Logging & SD-card wear
 

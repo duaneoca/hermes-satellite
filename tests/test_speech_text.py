@@ -78,3 +78,13 @@ def test_chunker_tail_without_punctuation_is_flushed():
 
 def test_chunker_empty_stream():
     assert list(iter_sentences([])) == []
+
+
+def test_is_stop_command():
+    from hermes_satellite.core.speech_text import is_stop_command
+    for yes in ("Stop.", "stop", "STOP TALKING", "Jarvis stop",
+                "Never mind!", "nevermind", "Cancel that.", "That's all."):
+        assert is_stop_command(yes), yes
+    for no in ("stop the timer", "what time is it", "", "  ",
+               "can you stop by the store", "stop and think about it"):
+        assert not is_stop_command(no), no

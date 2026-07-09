@@ -134,6 +134,12 @@ conversation:
   # reply short and starts a new turn. Detection competes with the speaker
   # 5 cm from the mics — works best at moderate volume.
   barge_in: false
+  # Optional dedicated interrupt phrase (e.g. "jarvis stop"): path to a
+  # custom-trained openWakeWord model (docs/wakeword.md section 4). When set,
+  # hearing it during playback STOPS the reply and returns to idle — a stop
+  # command, not a new question. Leave empty to barge with the main wake word.
+  barge_model_path: ""
+  # barge_threshold: 0.5   # detection threshold for it (default: wakeword.threshold)
 
 leds:
   backend: apa102          # apa102 | mock

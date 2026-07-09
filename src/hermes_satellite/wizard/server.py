@@ -516,6 +516,7 @@ def _make_handler(state: WizardState):
                             "follow_up_seconds": conv.follow_up_seconds,
                             "max_turns": conv.max_turns,
                             "barge_in": conv.barge_in,
+                            "barge_model": conv.barge_model_path,
                             "earcons": state.config.earcons.enabled,
                             "earcon_volume": state.config.earcons.volume})
             elif route == "/api/pending":
@@ -585,6 +586,8 @@ def _make_handler(state: WizardState):
                          "conversation", "follow_up_seconds", float),
                         ("max_turns", "conversation", "max_turns", int),
                         ("barge_in", "conversation", "barge_in", bool),
+                        ("barge_model",
+                         "conversation", "barge_model_path", str),
                         ("earcons", "earcons", "enabled", bool),
                         ("earcon_volume", "earcons", "volume", float),
                     ):

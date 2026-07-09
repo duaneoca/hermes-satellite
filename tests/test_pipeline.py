@@ -335,3 +335,39 @@ def test_barge_in_streaming_reply():
     # both questions reached Hermes; no hang from the synth-ahead producer
     assert [c[0] for c in hermes.calls] == ["q1", "q2"]
     assert sm.state is State.IDLE
+
+
+def test_stop_command_ends_followup_without_hermes():
+    source = FakeSource([b"one", b"stop-audio"])
+    pipe, sm, earcons, sink, hermes = _pipeline(
+        [True], source, ["one", "Stop."],
+        conversation=ConversationConfig(follow_up=True),
+    )
+    pipe.run_cycle()
+    assert [c[0] for c in hermes.calls] == ["one"]  # "Stop." never sent
+    assert earcons.played == ["wake", "listening", "done"]
+    assert sm.state is State.IDLE
+
+
+def test_dedicated_stop_model_barge_goes_idle():
+    """With conversation.barge_model_path wired (barge_wakeword), a barge
+    means STOP: playback aborts and the cycle ends — no new capture."""
+    source = FakeSource([b"one"])
+    sm = StateMachine(initial=State.IDLE)
+    earcons = SpyEarcons()
+    sink = RecordingSink()
+    hermes = FakeHermes()
+    stop_detector = FakeWake([True])   # fires immediately during playback
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True]),
+        audio_source=source, stt=FakeSTT(["one"]),
+        hermes=hermes, tts=FakeTTS(), audio_sink=sink,
+        session_key="k", is_muted=lambda: False, earcons=earcons,
+        conversation=ConversationConfig(barge_in=True),
+        barge_wakeword=stop_detector,
+    )
+    pipe.run_cycle()
+    assert len(hermes.calls) == 1
+    assert len(source.onsets) == 1           # no post-barge capture
+    assert earcons.played == ["wake", "done"]
+    assert sm.state is State.IDLE

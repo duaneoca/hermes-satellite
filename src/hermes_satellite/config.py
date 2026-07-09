@@ -167,6 +167,14 @@ class ConversationConfig:
     # sits 5 cm from the mics, so detection competes with our own voice —
     # works best at moderate volume.
     barge_in: bool = False
+    # Optional dedicated interrupt phrase (e.g. "jarvis stop"): path to a
+    # custom-trained openWakeWord model (docs/wakeword.md section 4). When
+    # set, hearing it during playback STOPS the reply and returns to idle —
+    # a stop command, not a new question. Empty = barge with the main wake
+    # word, which opens a new turn instead.
+    barge_model_path: str = ""
+    # Detection threshold for the barge model (None = wakeword.threshold).
+    barge_threshold: Optional[float] = None
 
 
 @dataclass

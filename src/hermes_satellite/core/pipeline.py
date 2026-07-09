@@ -34,7 +34,7 @@ from ..tts.base import TTSEngine
 from ..wakeword.base import WakeWordDetector
 from .earcons import Earcons
 from .events import Event, StateMachine
-from .speech_text import iter_sentences, make_speakable
+from .speech_text import is_stop_command, iter_sentences, make_speakable
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ class Pipeline:
         conversation: Optional[ConversationConfig] = None,
         mic_flush: Optional[Callable[[], None]] = None,
         stream_replies: bool = False,
+        barge_wakeword: Optional[WakeWordDetector] = None,
     ):
         self.sm = state_machine
         self.wakeword = wakeword
@@ -82,6 +83,10 @@ class Pipeline:
         self.conversation = conversation or ConversationConfig()
         self._mic_flush = mic_flush
         self.stream_replies = stream_replies
+        # Dedicated interrupt-phrase detector ("jarvis stop"). When present,
+        # a barge means STOP (back to idle); when absent, the main wake word
+        # barges and opens a new turn.
+        self.barge_wakeword = barge_wakeword
         self._running = False
         # Set while playback is interrupted by a barge-in wake word; consumed
         # by run_cycle to start a fresh turn instead of going idle.
@@ -113,11 +118,12 @@ class Pipeline:
             return
         interrupt = threading.Event()
         done = threading.Event()
+        detector = self.barge_wakeword or self.wakeword
 
         def listen():
             try:
-                if self.wakeword.wait_for_wake(self.is_muted, cancel=done):
-                    logger.info("barge-in: wake word during playback")
+                if detector.wait_for_wake(self.is_muted, cancel=done):
+                    logger.info("barge-in: interrupt phrase during playback")
                     interrupt.set()
             except Exception:  # never let the listener kill playback
                 logger.exception("barge listener failed")
@@ -149,6 +155,12 @@ class Pipeline:
         text = self.stt.transcribe(audio)
         logger.info("transcript: %s", text)
         if not text.strip():
+            return False
+        if is_stop_command(text):
+            # "stop" / "never mind" after a barge or in a follow-up window:
+            # the user wants out, not an answer — skip the Hermes round-trip.
+            logger.info("stop command — going idle")
+            self._chime("done")
             return False
 
         if self._stream_enabled():
@@ -286,10 +298,17 @@ class Pipeline:
             turns += 1
             # A successful turn ended with PLAYBACK_DONE, so we're at IDLE.
             if self._barged:
+                self._barged = False
+                if self.barge_wakeword is not None:
+                    # Dedicated stop phrase ("jarvis stop"): the user wants
+                    # silence, not a new question. Playback already aborted;
+                    # acknowledge and settle to idle.
+                    logger.info("stop phrase — conversation over")
+                    self._chime("done")
+                    return
                 # The wake word cut playback short: start a fresh turn,
                 # exactly like a normal wake (the barge listener already
                 # consumed the wake word itself).
-                self._barged = False
                 self.sm.dispatch(Event.WAKE_DETECTED)
                 self._chime("wake")
                 self._flush_mic()
