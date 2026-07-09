@@ -13,6 +13,9 @@ Endpoints (all require the one-time token via ``?token=`` or
   POST /api/wake/start|stop   live wake-word score monitor
   GET  /api/wake              {best, last, detections}
   POST /api/wake/config       {threshold}
+  GET  /api/wake/model        current + pretrained wake models
+  POST /api/wake/model        {model_path: pretrained name (auto-download)
+                              or path to a custom .onnx/.tflite}
   GET  /api/voices            downloaded + catalog voices
   POST /api/voices/preview    {name, speaker_id, length_scale, text}
   POST /api/stt/prepare       load/download the STT model (into the
@@ -87,6 +90,23 @@ def _ensure_voices_dir(config) -> None:
                 f"sudo mkdir -p {path} && sudo chown -R {user} {data_dir}"
             )
     logger.info("created %s (owned by %s) via sudo", path, user)
+
+
+# Wake phrases openWakeWord ships pretrained models for (timer/weather are
+# command models, not wake words — deliberately excluded).
+PRETRAINED_WAKEWORDS = ("hey_jarvis", "alexa", "hey_mycroft", "hey_rhasspy")
+
+
+def _oww_model_downloaded(name: str) -> bool:
+    """Is a pretrained model on disk? Prefix glob — files carry a version
+    suffix (hey_jarvis -> hey_jarvis_v0.1.onnx)."""
+    try:
+        import openwakeword
+
+        resources = Path(openwakeword.__file__).parent / "resources" / "models"
+        return any(resources.glob(f"{name}*"))
+    except ImportError:
+        return False
 
 
 def _ensure_stt_cache(config) -> None:
@@ -449,6 +469,14 @@ def _make_handler(state: WizardState):
             elif route == "/api/meter":
                 self._json({"rms_pct": state.meter.rms_pct,
                             "p99_pct": state.meter.p99_pct})
+            elif route == "/api/wake/model":
+                current = state.config.wakeword.model_path
+                self._json({
+                    "current": current,
+                    "pretrained": list(PRETRAINED_WAKEWORDS),
+                    "downloaded": {n: _oww_model_downloaded(n)
+                                   for n in PRETRAINED_WAKEWORDS},
+                })
             elif route == "/api/wake":
                 self._json({"best": state.wake.best, "last": state.wake.last,
                             "detections": state.wake.detections,
@@ -526,6 +554,8 @@ def _make_handler(state: WizardState):
                 elif route == "/api/wake/stop":
                     state.wake.stop()
                     self._json({"ok": True})
+                elif route == "/api/wake/model":
+                    self._wake_model(body)
                 elif route == "/api/wake/config":
                     state.set_pending(
                         "wakeword", "threshold", float(body["threshold"])
@@ -667,6 +697,35 @@ def _make_handler(state: WizardState):
             self._json({"ok": True, "sample_rate": tts.sample_rate,
                         "downloaded": not was_downloaded,
                         "elapsed": elapsed})
+
+        def _wake_model(self, body):
+            """Switch wake word: a pretrained name (auto-downloaded) or a
+            path to a custom-trained model file."""
+            name = (body.get("model_path") or "").strip()
+            if not name:
+                return self._json({"error": "model_path required"}, 400)
+            state.wake.stop()  # a running test would keep the old model
+            note = "set ✓ — run the listening test to calibrate the threshold"
+            if name in PRETRAINED_WAKEWORDS:
+                if not _oww_model_downloaded(name):
+                    try:
+                        import openwakeword.utils
+
+                        with _heavy_lock:
+                            openwakeword.utils.download_models(
+                                model_names=[name])
+                        note = "downloaded and " + note
+                    except Exception as exc:
+                        return self._json({
+                            "error": f"download failed ({exc}) — if the "
+                                     "package dir is read-only, pre-seed as "
+                                     "root (see 'Running as a service')"})
+            elif not Path(name).is_file():
+                return self._json(
+                    {"error": f"no model file at {name} — give a pretrained "
+                              "name or the path to a trained .onnx/.tflite"})
+            state.set_pending("wakeword", "model_path", name)
+            self._json({"ok": True, "note": note, "model_path": name})
 
         def _stt_prepare(self):
             """Load (and on first use download) the STT model. Split from the

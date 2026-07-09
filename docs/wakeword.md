@@ -33,6 +33,8 @@ openWakeWord experiences — a broken runtime looks identical to a bad model.)
 wakeword:
   backend: openwakeword
   model_path: hey_jarvis     # pretrained: hey_jarvis | alexa | hey_mycroft | hey_rhasspy
+                             # (or pick it in the setup wizard's Wake word
+                             #  section — downloads automatically)
   threshold: 0.5
 ```
 

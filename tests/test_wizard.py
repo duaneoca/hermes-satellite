@@ -540,3 +540,80 @@ def test_page_has_transcription_section(wizard):
     assert "Transcription" in html
     assert "/api/stt/prepare" in html
     assert "/api/stt/test" in html
+
+
+def _fake_oww(monkeypatch, tmp_path, downloaded=()):
+    """Install a fake openwakeword package with the given models on disk
+    (real on-disk naming: versioned files)."""
+    import sys
+    import types as t
+
+    pkg_dir = tmp_path / "openwakeword"
+    models = pkg_dir / "resources" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in downloaded:
+        (models / f"{name}_v0.1.onnx").write_bytes(b"x")
+    fake = t.ModuleType("openwakeword")
+    fake.__file__ = str(pkg_dir / "__init__.py")
+    utils = t.ModuleType("openwakeword.utils")
+    fetched = []
+
+    def download_models(model_names=None):
+        for name in model_names or []:
+            fetched.append(name)
+            (models / f"{name}_v0.1.onnx").write_bytes(b"x")
+
+    utils.download_models = download_models
+    fake.utils = utils
+    monkeypatch.setitem(sys.modules, "openwakeword", fake)
+    monkeypatch.setitem(sys.modules, "openwakeword.utils", utils)
+    return fetched
+
+
+def test_wake_model_listing(wizard, monkeypatch, tmp_path):
+    _fake_oww(monkeypatch, tmp_path, downloaded=("hey_jarvis",))
+    state, base = wizard
+    _, body = _get(f"{base}/api/wake/model?token={state.token}")
+    assert body["current"] == "hey_jarvis"
+    assert "hey_mycroft" in body["pretrained"]
+    assert body["downloaded"]["hey_jarvis"] is True
+    assert body["downloaded"]["hey_mycroft"] is False
+
+
+def test_wake_model_switch_downloads_and_pends(wizard, monkeypatch, tmp_path):
+    fetched = _fake_oww(monkeypatch, tmp_path, downloaded=("hey_jarvis",))
+    state, base = wizard
+    _, r = _post(f"{base}/api/wake/model?token={state.token}",
+                 {"model_path": "hey_mycroft"})
+    assert r["ok"] is True
+    assert "downloaded" in r["note"]
+    assert fetched == ["hey_mycroft"]
+    assert state.config.wakeword.model_path == "hey_mycroft"
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["wakeword.model_path"] == "hey_mycroft"
+    # already on disk: no second download
+    _, r = _post(f"{base}/api/wake/model?token={state.token}",
+                 {"model_path": "hey_jarvis"})
+    assert fetched == ["hey_mycroft"]
+    assert r["ok"] is True
+
+
+def test_wake_model_custom_path(wizard, tmp_path):
+    state, base = wizard
+    custom = tmp_path / "hey_hermes.onnx"
+    _, r = _post(f"{base}/api/wake/model?token={state.token}",
+                 {"model_path": str(custom)})
+    assert "no model file" in r["error"]
+    custom.write_bytes(b"x")
+    _, r = _post(f"{base}/api/wake/model?token={state.token}",
+                 {"model_path": str(custom)})
+    assert r["ok"] is True
+    assert state.config.wakeword.model_path == str(custom)
+
+
+def test_page_has_wake_model_picker(wizard):
+    state, base = wizard
+    with urllib.request.urlopen(f"{base}/?token={state.token}") as r:
+        html = r.read().decode()
+    assert 'id="wwm"' in html and 'id="wwp"' in html
+    assert "/api/wake/model" in html

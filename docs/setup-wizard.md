@@ -45,7 +45,11 @@ open**.
    "Apply WM8960 recipe" (the full routing fix from the Pi 4 guide),
    and Persist (`alsactl store`; falls back to printing the sudo
    command if it needs root). Only whitelisted controls are settable.
-4. **Wake word** — live score monitor + detection counter; set the
+4. **Wake word** — pick the wake phrase from openWakeWord's pretrained
+   models (hey_jarvis / alexa / hey_mycroft / hey_rhasspy — a new choice
+   downloads its model automatically) or point at a custom-trained
+   `.onnx`/`.tflite` (see [wakeword.md](wakeword.md) §4 for training one).
+   Then the live score monitor + detection counter; set the
    threshold from evidence. Model load takes a few seconds on a Pi:
    the page shows "starting" until scoring actually begins, and the
    HAT LEDs light in the listening color while the test is live —

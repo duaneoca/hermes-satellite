@@ -70,11 +70,17 @@ behind your back.</p>
 
 <h2>4 · Wake word</h2>
 <section>
+  <label>Wake phrase <select id="wwm" onchange="wakeModel(this.value)"></select></label>
+  <label class="muted">or custom model
+    <input id="wwp" size="34" placeholder="/path/to/hey_hermes.onnx"
+      title="a model trained with openWakeWord's training notebook — see docs/wakeword.md"></label>
+  <button onclick="wakeModel(document.getElementById('wwp').value)">Use custom</button>
+  <span id="wwres" class="muted"></span>
   <p class="muted">Start, then <b>watch the device</b>: when the HAT LEDs
   begin breathing blue — the same indication the running daemon shows while
   waiting for its wake word — it's listening. Say the wake phrase a few
   times. Threshold should sit comfortably below your spoken scores and above
-  ambient.</p>
+  ambient. After changing the phrase, rerun the test and recalibrate.</p>
   <button onclick="wakeStart()">Start listening test</button>
   <button onclick="wakeStop()">Stop</button>
   <b id="wstat" class="muted"></b>
@@ -281,6 +287,26 @@ function mixerStore() {
            : (r.hint || r.error || "failed");
   });
 }
+function loadWakeModel() {
+  get("/api/wake/model").then(w => {
+    const sel = document.getElementById("wwm");
+    const names = w.pretrained.slice();
+    if (!names.includes(w.current)) names.unshift(w.current);
+    sel.innerHTML = names.map(n =>
+      `<option value="${n}" ${n===w.current?"selected":""}>${n}` +
+      `${w.downloaded[n]===false?" (will download)":""}</option>`).join("");
+  });
+}
+function wakeModel(value) {
+  if (!value) return;
+  const res = document.getElementById("wwres");
+  res.textContent = "applying… (a new phrase downloads its model first)";
+  post("/api/wake/model", {model_path: value}).then(r => {
+    res.textContent = r.error ? ("failed: " + r.error) : r.note;
+    loadWakeModel();
+    loadPending();
+  });
+}
 function wakeStart() {
   post("/api/wake/start");
   document.getElementById("wstat").textContent = "starting (loading model)…";
@@ -438,7 +464,7 @@ function save() {
         "restart the daemon to apply.";
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt(); loadWakeModel();
 </script>
 </body>
 </html>
