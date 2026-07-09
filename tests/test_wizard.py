@@ -657,3 +657,23 @@ def test_stt_capture_uses_generous_onset_window(wizard, monkeypatch):
     assert r["transcript"] == "ten four"
     assert seen["onset"] >= 10
     assert seen["closed"] is True
+
+
+def test_hermes_prompt_prefill_and_edit(wizard):
+    from hermes_satellite.config import DEFAULT_SYSTEM_PROMPT
+    state, base = wizard
+    _, body = _get(f"{base}/api/hermes?token={state.token}")
+    assert body["system_prompt"] == DEFAULT_SYSTEM_PROMPT
+    assert body["default_prompt"] == DEFAULT_SYSTEM_PROMPT
+
+    custom = "You are Jarvis. Answer in one dry sentence, plain prose."
+    _post(f"{base}/api/hermes/prompt?token={state.token}",
+          {"system_prompt": custom})
+    assert state.config.hermes.system_prompt == custom
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["hermes.system_prompt"] == custom
+
+    # "" is allowed: disables the system message
+    _post(f"{base}/api/hermes/prompt?token={state.token}",
+          {"system_prompt": ""})
+    assert state.config.hermes.system_prompt == ""

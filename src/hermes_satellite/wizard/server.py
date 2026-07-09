@@ -25,6 +25,7 @@ Endpoints (all require the one-time token via ``?token=`` or
   GET  /api/behavior          streaming / follow-up / earcon settings
   POST /api/behavior/config   any subset of the /api/behavior fields
   POST /api/hermes/test       {host, port, api_key, session_key} -> health+chat
+  POST /api/hermes/prompt     {system_prompt} ("" = send none)
   POST /api/save              write <config>.new; returns paths + mv command
   POST /api/exit              shut the wizard down
 """
@@ -502,13 +503,16 @@ def _make_handler(state: WizardState):
                             "device_id": mqtt_cfg.device_id,
                             "password_hint": hint})
             elif route == "/api/hermes":
+                from ..config import DEFAULT_SYSTEM_PROMPT
                 hermes = state.config.hermes
                 key = hermes.api_key
                 hint = ("••••" + key[-4:]) if len(key) > 8 else \
                        ("••••" if key else "")
                 self._json({"host": hermes.host, "port": hermes.port,
                             "session_key": hermes.session_key,
-                            "api_key_hint": hint})
+                            "api_key_hint": hint,
+                            "system_prompt": hermes.system_prompt,
+                            "default_prompt": DEFAULT_SYSTEM_PROMPT})
             elif route == "/api/behavior":
                 conv = state.config.conversation
                 self._json({"stream": state.config.hermes.stream,
@@ -578,6 +582,13 @@ def _make_handler(state: WizardState):
                     self._stt_test()
                 elif route == "/api/hermes/test":
                     self._hermes_test(body)
+                elif route == "/api/hermes/prompt":
+                    # "" is allowed (disables the system message entirely)
+                    state.set_pending(
+                        "hermes", "system_prompt",
+                        str(body.get("system_prompt", "")).strip(),
+                    )
+                    self._json({"ok": True})
                 elif route == "/api/behavior/config":
                     for key, section, field, cast in (
                         ("stream", "hermes", "stream", bool),

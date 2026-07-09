@@ -61,7 +61,11 @@ open**.
    pre-seed step.
 6. **Voice** — full catalog + downloaded voices, on-device preview with
    speaker/pace knobs (downloads on demand).
-7. **Hermes** — health + authenticated round-trip chat test.
+7. **Hermes** — health + authenticated round-trip chat test, and the
+   **system prompt** sent before every utterance (default: answer in
+   short, speakable plain prose). Edit it to give the assistant
+   personality — keep the no-markdown instruction, or replies get read
+   aloud with the asterisks. Reset-to-default button included.
 8. **Conversation & sounds** — streamed replies (speak while the rest of
    the answer is still arriving), follow-up mode (window length + max
    turns per conversation), barge-in (the wake word interrupts a reply,

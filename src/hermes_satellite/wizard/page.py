@@ -121,6 +121,14 @@ behind your back.</p>
   <label>API key <input id="hk" size="24" type="password"></label>
   <button onclick="hermesTest()">Test connection + chat</button>
   <p id="hres"></p>
+  <label class="muted">System prompt — sent before every utterance; the
+  default asks for short, speakable plain prose (add personality here, but
+  keep the no-markdown instruction or replies get read aloud with the
+  asterisks)<br>
+  <textarea id="hsp" rows="4" style="width:100%;max-width:640px"></textarea></label><br>
+  <button onclick="savePrompt()">Apply prompt</button>
+  <button onclick="resetPrompt()">Reset to default</button>
+  <span id="hspres" class="muted"></span>
 </section>
 
 <h2>8 · Conversation &amp; sounds</h2>
@@ -391,6 +399,7 @@ function preview() {
     loadPending();
   });
 }
+let defaultPrompt = "";
 function loadHermes() {
   get("/api/hermes").then(h => {
     document.getElementById("hh").value = h.host || "";
@@ -399,7 +408,24 @@ function loadHermes() {
     document.getElementById("hk").placeholder = h.api_key_hint
       ? `configured ${h.api_key_hint} — leave blank to keep`
       : "no key configured";
+    document.getElementById("hsp").value = h.system_prompt || "";
+    defaultPrompt = h.default_prompt || "";
   });
+}
+function savePrompt() {
+  post("/api/hermes/prompt",
+       {system_prompt: document.getElementById("hsp").value})
+  .then(r => {
+    document.getElementById("hspres").textContent = r.error
+      ? ("failed: " + r.error)
+      : (document.getElementById("hsp").value.trim()
+         ? "set ✓" : "cleared — no system message will be sent");
+    loadPending();
+  });
+}
+function resetPrompt() {
+  document.getElementById("hsp").value = defaultPrompt;
+  savePrompt();
 }
 function behavior(change) {
   post("/api/behavior/config", change).then(loadPending);

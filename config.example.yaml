@@ -59,9 +59,16 @@ hermes:
   # first audio within a few seconds instead of after the whole reply.
   # Falls back to non-streaming automatically if the stream can't start.
   stream: true
-  # A system message sent before each utterance; defaults to an instruction
-  # to answer in short, speakable plain prose. Set "" to disable.
-  # system_prompt: ""
+  # A system message sent before every utterance. Defaults to an instruction
+  # to answer in short, speakable plain prose — editable in the wizard's
+  # Hermes section, or here as a block scalar. If you customize it, keep the
+  # no-markdown part or replies get read aloud with the asterisks.
+  # Set to "" to send no system message at all.
+  # system_prompt: >-
+  #   Your reply will be spoken aloud by a voice assistant. Respond in plain
+  #   conversational prose only: no markdown, asterisks, bullet points,
+  #   headers, tables, code blocks, or emojis. Be concise — one to three
+  #   sentences — unless the user asks for detail.
 
 audio:
   backend: alsa            # alsa | mock
