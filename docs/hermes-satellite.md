@@ -291,8 +291,9 @@ ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
   against the live `/etc/hermes-satellite/config.yaml`.
 * `hermes-satellite doctor` — one-shot health check from a shell (no
   wizard needed): board vs profile, SPI, ALSA card, onnxruntime pin, model
-  files, Hermes reachability. Exit code 1 if anything failed. On a deployed
-  satellite:
+  files, Hermes reachability. Exit code 1 if anything failed. Read-only and
+  never opens the microphone, so it's safe to run whether or not the
+  service is running. On a deployed satellite:
   ```bash
   sudo /opt/hermes-satellite/.venv/bin/hermes-satellite doctor --config /etc/hermes-satellite/config.yaml
   ```

@@ -81,3 +81,27 @@ def test_cli_doctor_subcommand(tmp_path, monkeypatch):
                    "wakeword:\n  model_path: hey_jarvis\n"
                    f"data_dir: {tmp_path}\n")
     assert main(["doctor", "--config", str(cfg)]) == 0
+
+
+def test_wake_models_matches_versioned_filenames(tmp_path, monkeypatch):
+    """Regression: pretrained files carry a version suffix on disk
+    (hey_jarvis_v0.1.onnx) — the check reported a working install as
+    missing because it globbed for hey_jarvis.* exactly."""
+    import sys
+    import types as t
+
+    pkg_dir = tmp_path / "openwakeword"
+    models = pkg_dir / "resources" / "models"
+    models.mkdir(parents=True)
+    fake = t.ModuleType("openwakeword")
+    fake.__file__ = str(pkg_dir / "__init__.py")
+    monkeypatch.setitem(sys.modules, "openwakeword", fake)
+
+    config = _config(tmp_path)
+    # nothing downloaded yet
+    assert doctor_mod._check_wake_models(config).ok is False
+    # versioned model file + shared feature models, as shipped
+    (models / "hey_jarvis_v0.1.onnx").write_bytes(b"x")
+    (models / "embedding_model.onnx").write_bytes(b"x")
+    check = doctor_mod._check_wake_models(config)
+    assert check.ok is True, check.detail

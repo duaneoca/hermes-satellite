@@ -30,6 +30,26 @@ def _board_model(path: str = "/proc/device-tree/model") -> str:
         return ""
 
 
+def _import_onnxruntime_quietly():
+    """Import onnxruntime with fd-level stderr silenced.
+
+    On a Pi its import-time GPU probe reads PCI-only sysfs attrs that the
+    VC4 display devices don't have and warns noisily straight to fd 2
+    (bypassing sys.stderr) before falling back to CPU — which is the only
+    provider we use anyway.
+    """
+    saved = os.dup(2)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, 2)
+        import onnxruntime
+        return onnxruntime
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+        os.close(devnull)
+
+
 def run_checks(config) -> List[Check]:
     from .wizard import mixer
 
@@ -61,8 +81,7 @@ def run_checks(config) -> List[Check]:
     ))
 
     try:
-        import onnxruntime
-        ver = onnxruntime.__version__
+        ver = _import_onnxruntime_quietly().__version__
         checks.append(Check(
             "onnxruntime", ver < "1.27",
             ver if ver < "1.27" else
@@ -137,8 +156,10 @@ def _check_wake_models(cfg) -> Check:
     except ImportError:
         return Check("wake_models", False, "openwakeword not installed")
     # The named model plus the shared feature models it depends on.
-    have_model = any(resources.glob(f"{name}.*"))
-    have_features = any(resources.glob("embedding_model.*"))
+    # Prefix glob: pretrained files carry a version suffix on disk
+    # (hey_jarvis -> hey_jarvis_v0.1.onnx).
+    have_model = any(resources.glob(f"{name}*"))
+    have_features = any(resources.glob("embedding_model*"))
     if have_model and have_features:
         return Check("wake_models", True, f"{name} (in {resources})")
     return Check(
