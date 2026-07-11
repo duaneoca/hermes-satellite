@@ -50,7 +50,8 @@ Streaming needs a **streaming model variant**, which are separate weights:
 **no base-streaming**. So with streaming on, set `stt.model` to
 `moonshine/tiny`, `moonshine/small` or `moonshine/medium`
 (`moonshine/small` is the closest to base quality; the backend raises a
-clear error if you leave it on `base`). First use downloads the variant —
+clear error if you leave it on `base`, and the wizard's model picker
+auto-switches `base` to `small` when you enable streaming). First use downloads the variant —
 run the wizard's Transcription test (which uses the same mode and warms the
 service's cache) and spot-check accuracy there before trusting it.
 
