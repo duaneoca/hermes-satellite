@@ -725,4 +725,6 @@ def test_page_stt_picker_lists_all_variants(wizard):
         html = r.read().decode()
     assert 'id="sm"' in html
     assert "models_streaming" in html and "models_batch" in html
-    assert "transcribes while you talk" in html
+    # grouped presentation: same size can appear in both modes
+    assert "optgroup" in html
+    assert "transcribe while you talk" in html.lower()

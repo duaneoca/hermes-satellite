@@ -356,16 +356,21 @@ function sttModel(value) {
 function loadSttConfig() {
   get("/api/stt/config").then(s => {
     document.getElementById("sms").value = s.silence_ms;
-    const opts = [];
-    for (const m of s.models_batch)
-      opts.push({v: "batch:" + m, sel: !s.streaming && m === s.model,
-                 label: m + " — transcribes after you finish speaking"});
-    for (const m of s.models_streaming)
-      opts.push({v: "stream:" + m, sel: s.streaming && m === s.model,
-                 label: m + " — streaming: transcribes while you talk"});
-    if (!opts.some(o => o.sel)) opts[1].sel = true;  // config combo invalid: show default
-    document.getElementById("sm").innerHTML = opts.map(o =>
-      `<option value="${o.v}" ${o.sel?"selected":""}>${o.label}</option>`).join("");
+    // tiny appears in BOTH groups on purpose: batch and streaming are
+    // different model weights for the same size.
+    const batch = s.models_batch.map(m =>
+      ({v: "batch:" + m, label: m, sel: !s.streaming && m === s.model}));
+    const streaming = s.models_streaming.map(m =>
+      ({v: "stream:" + m, label: m, sel: s.streaming && m === s.model}));
+    if (![...batch, ...streaming].some(o => o.sel))
+      batch[1].sel = true;  // config combo invalid: show the default
+    const opt = o =>
+      `<option value="${o.v}" ${o.sel?"selected":""}>${o.label}</option>`;
+    document.getElementById("sm").innerHTML =
+      `<optgroup label="Transcribe after you finish speaking">` +
+      batch.map(opt).join("") + `</optgroup>` +
+      `<optgroup label="Streaming — transcribe while you talk (answer ~1s sooner)">` +
+      streaming.map(opt).join("") + `</optgroup>`;
   });
 }
 function sttTest() {
