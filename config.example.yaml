@@ -84,17 +84,25 @@ audio:
   input_channels: 1
   # webrtcvad aggressiveness 0-3 (higher = more aggressive filtering).
   vad_aggressiveness: 2
-  # End the utterance after this much trailing silence.
+  # End the utterance after this much trailing silence. Every 100ms cut is
+  # 100ms off every turn's latency — but too low clips slow talkers. Tune
+  # with the wizard's Transcription section + the 'turn timing' log lines.
   silence_ms: 800
   # Give up if no speech starts within this window after the wake word.
   speech_timeout_seconds: 5.0
-  # Hard cap on a single utterance.
+  # Hard cap on a single utterance — runaway-capture protection (a TV or a
+  # stuck VAD can't pin the mic open). Raise it if long requests get cut off.
   max_record_seconds: 10.0
 
 stt:
   backend: moonshine       # moonshine | ...
-  model: moonshine/base    # moonshine/tiny | moonshine/base
+  model: moonshine/base    # moonshine/tiny | moonshine/base (batch)
   language: en
+  # Transcribe WHILE you speak: transcript ready the moment you stop.
+  # Needs a streaming model variant — set model to moonshine/tiny, small or
+  # medium (no base-streaming exists; small is closest to base quality).
+  # Separate weights, downloaded on first use (wizard Transcription test).
+  streaming: false
 
 tts:
   backend: piper           # piper | ...

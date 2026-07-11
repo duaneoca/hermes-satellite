@@ -21,6 +21,11 @@ Endpoints (all require the one-time token via ``?token=`` or
   POST /api/stt/prepare       load/download the STT model (into the
                               service's cache location)
   POST /api/stt/test          capture one utterance and transcribe it
+  GET  /api/stt/config        {model, streaming, silence_ms,
+                              max_record_seconds, valid models}
+  POST /api/stt/config        any subset of the same fields;
+                              enabling streaming auto-switches an invalid
+                              model (base) to moonshine/small
   GET  /api/pending           accumulated changes
   GET  /api/behavior          streaming / follow-up / earcon settings
   POST /api/behavior/config   any subset of the /api/behavior fields
@@ -523,6 +528,17 @@ def _make_handler(state: WizardState):
                             "barge_model": conv.barge_model_path,
                             "earcons": state.config.earcons.enabled,
                             "earcon_volume": state.config.earcons.volume})
+            elif route == "/api/stt/config":
+                from ..stt.moonshine_backend import _STREAMING_SIZES
+                self._json({
+                    "model": state.config.stt.model,
+                    "streaming": state.config.stt.streaming,
+                    "silence_ms": state.config.audio.silence_ms,
+                    "max_record_seconds": state.config.audio.max_record_seconds,
+                    "models_batch": ["moonshine/tiny", "moonshine/base"],
+                    "models_streaming": [f"moonshine/{s}"
+                                         for s in _STREAMING_SIZES],
+                })
             elif route == "/api/pending":
                 self._json(state.pending)
             else:
@@ -576,6 +592,29 @@ def _make_handler(state: WizardState):
                     self._json(mixer.store())
                 elif route == "/api/voices/preview":
                     self._preview(body)
+                elif route == "/api/stt/config":
+                    from ..stt.moonshine_backend import _STREAMING_SIZES
+                    if "model" in body:
+                        state.set_pending("stt", "model", str(body["model"]))
+                        state._stt_engine = None  # different weights
+                    if "streaming" in body:
+                        streaming = bool(body["streaming"])
+                        state.set_pending("stt", "streaming", streaming)
+                        size = state.config.stt.model.rsplit("/", 1)[-1]
+                        if streaming and size not in _STREAMING_SIZES:
+                            # No base-streaming model exists: don't let the
+                            # UI produce a config that fails at model load.
+                            state.set_pending(
+                                "stt", "model", "moonshine/small")
+                        state._stt_engine = None  # different model variant
+                    if "silence_ms" in body:
+                        state.set_pending(
+                            "audio", "silence_ms", int(body["silence_ms"]))
+                    if "max_record_seconds" in body:
+                        state.set_pending(
+                            "audio", "max_record_seconds",
+                            float(body["max_record_seconds"]))
+                    self._json({"ok": True})
                 elif route == "/api/stt/prepare":
                     self._stt_prepare()
                 elif route == "/api/stt/test":

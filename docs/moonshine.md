@@ -27,14 +27,33 @@ pip install moonshine-voice        # already in the [pi4]/[pi5] extras
 ```yaml
 stt:
   backend: moonshine
-  model: moonshine/base    # moonshine/tiny | moonshine/base
+  model: moonshine/base    # moonshine/tiny | moonshine/base (batch)
   language: en
+  streaming: false         # see below
 ```
 
 | Model             | Notes                            |
 | ----------------- | -------------------------------- |
 | `moonshine/tiny`  | Fastest, lowest footprint        |
 | `moonshine/base`  | More accurate; default in config |
+
+### Streaming transcription (`stt.streaming: true`)
+
+With streaming on, audio is fed to the model **while you speak** (the capture
+loop calls into a `Transcriber.create_stream()` session per utterance), so
+the transcript is ready the moment you stop — removing the ~1 s
+transcription stall a Pi 4 pays after capture. Verified by loopback:
+`update_transcription()` finalizes in ~1 ms after the last frame.
+
+Streaming needs a **streaming model variant**, which are separate weights:
+`tiny-streaming-en`, `small-streaming-en`, `medium-streaming-en` — there is
+**no base-streaming**. So with streaming on, set `stt.model` to
+`moonshine/tiny`, `moonshine/small` or `moonshine/medium`
+(`moonshine/small` is the closest to base quality; the backend raises a
+clear error if you leave it on `base`, and the wizard's model picker
+auto-switches `base` to `small` when you enable streaming). First use downloads the variant —
+run the wizard's Transcription test (which uses the same mode and warms the
+service's cache) and spot-check accuracy there before trusting it.
 
 ## How the backend uses the API (moonshine-voice 0.1.x)
 

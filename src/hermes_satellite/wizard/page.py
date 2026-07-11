@@ -98,6 +98,16 @@ behind your back.</p>
   <button onclick="sttTest()">Test transcription</button>
   <b id="sstat" class="muted"></b>
   <p>heard: <b id="stext">–</b> <span id="stime" class="muted"></span></p>
+  <label>Model <select id="sm" onchange="sttModel(this.value)"
+    title="streaming variants transcribe WHILE you talk, so the answer starts ~1s sooner; batch variants transcribe after you finish"></select></label><br>
+  <label class="muted">End-of-speech silence
+    <input id="sms" type="number" min="200" max="2000" step="50" style="width:5.5rem"
+      title="how long a CONTINUOUS pause ends your question (talking resets it) — every 100ms cut is 100ms off every turn, but too low cuts off slow talkers"
+      onchange="sttConfig({silence_ms:this.value})"> ms</label>
+  <label class="muted">Max utterance
+    <input id="smr" type="number" min="5" max="60" step="5" style="width:4.5rem"
+      title="hard cap on one utterance — runaway-capture protection (a TV can't pin the mic open); raise it if it cuts off long requests"
+      onchange="sttConfig({max_record_seconds:this.value})"> s</label>
 </section>
 
 <h2>6 · Voice</h2>
@@ -340,6 +350,34 @@ function wakeStop() {
   clearInterval(wakeTimer);
   document.getElementById("wstat").textContent = "stopped";
 }
+function sttConfig(change) {
+  post("/api/stt/config", change).then(() => { loadSttConfig(); loadPending(); });
+}
+function sttModel(value) {
+  const sep = value.indexOf(":");
+  sttConfig({model: value.slice(sep + 1), streaming: value.slice(0, sep) === "stream"});
+}
+function loadSttConfig() {
+  get("/api/stt/config").then(s => {
+    document.getElementById("sms").value = s.silence_ms;
+    document.getElementById("smr").value = s.max_record_seconds;
+    // tiny appears in BOTH groups on purpose: batch and streaming are
+    // different model weights for the same size.
+    const batch = s.models_batch.map(m =>
+      ({v: "batch:" + m, label: m, sel: !s.streaming && m === s.model}));
+    const streaming = s.models_streaming.map(m =>
+      ({v: "stream:" + m, label: m, sel: s.streaming && m === s.model}));
+    if (![...batch, ...streaming].some(o => o.sel))
+      batch[1].sel = true;  // config combo invalid: show the default
+    const opt = o =>
+      `<option value="${o.v}" ${o.sel?"selected":""}>${o.label}</option>`;
+    document.getElementById("sm").innerHTML =
+      `<optgroup label="Transcribe after you finish speaking">` +
+      batch.map(opt).join("") + `</optgroup>` +
+      `<optgroup label="Streaming — transcribe while you talk (answer ~1s sooner)">` +
+      streaming.map(opt).join("") + `</optgroup>`;
+  });
+}
 function sttTest() {
   const stat = document.getElementById("sstat");
   const text = document.getElementById("stext");
@@ -495,7 +533,7 @@ function save() {
         "restart the daemon to apply.";
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt(); loadWakeModel();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt(); loadWakeModel(); loadSttConfig();
 </script>
 </body>
 </html>

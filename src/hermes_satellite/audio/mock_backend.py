@@ -17,7 +17,8 @@ class MockAudioSource(AudioSource):
         self._config = config
         self._seconds = capture_seconds
 
-    def capture_utterance(self, is_muted: Callable[[], bool], onset_timeout=None) -> bytes:
+    def capture_utterance(self, is_muted: Callable[[], bool], onset_timeout=None,
+                          on_frame=None) -> bytes:
         if is_muted():
             return b""
         if onset_timeout is not None:
@@ -28,7 +29,10 @@ class MockAudioSource(AudioSource):
         time.sleep(self._seconds)
         # 16-bit mono PCM of silence for the requested duration.
         n_samples = int(self._config.sample_rate * self._seconds)
-        return b"\x00\x00" * n_samples
+        audio = b"\x00\x00" * n_samples
+        if on_frame is not None:
+            on_frame(audio)
+        return audio
 
 
 class MockAudioSink(AudioSink):

@@ -57,6 +57,17 @@ Reuses the proven guts: --ww-monitor, voices preview, wm8960-mixer.sh.
 - ✅ SSE streaming from Hermes + sentence-chunked Piper synthesis —
   shipped 2026-07-08.
 
+## Latency (branch: `latency`, 2026-07-09)
+
+Informed by an Echo-vs-Jarvis comparison. Streaming TTS + warm models were
+already shipped; this branch adds:
+
+- ✅ Per-turn timing instrumentation (`turn timing:` INFO line).
+- ✅ Streaming STT (`stt.streaming` + tiny/small/medium streaming models):
+  transcription runs during capture — transcript ready at end of speech.
+- ✅ End-of-speech silence knob in the wizard (`audio.silence_ms`).
+- Deferred: local command fast-path (on-device intents skipping Hermes).
+
 ## V2+
 
 - ✅ Barge-in — shipped 2026-07-08 (`conversation.barge_in`, default off):

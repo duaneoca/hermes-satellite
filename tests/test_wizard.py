@@ -677,3 +677,57 @@ def test_hermes_prompt_prefill_and_edit(wizard):
     _post(f"{base}/api/hermes/prompt?token={state.token}",
           {"system_prompt": ""})
     assert state.config.hermes.system_prompt == ""
+
+
+def test_stt_config_prefill_and_pend(wizard):
+    state, base = wizard
+    _, body = _get(f"{base}/api/stt/config?token={state.token}")
+    assert body["streaming"] is False
+    assert body["silence_ms"] == 800
+    assert body["model"] == "moonshine/base"
+    assert "moonshine/small" in body["models_streaming"]
+    assert "moonshine/base" in body["models_batch"]
+    assert body["max_record_seconds"] == 10.0
+    _post(f"{base}/api/stt/config?token={state.token}",
+          {"streaming": True, "silence_ms": "600",
+           "max_record_seconds": "25"})
+    assert state.config.stt.streaming is True
+    assert state.config.audio.silence_ms == 600
+    assert state.config.audio.max_record_seconds == 25.0
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["stt.streaming"] is True
+    assert pending["audio.silence_ms"] == 600
+    # engine cache dropped: the next prepare loads the streaming variant
+    assert state._stt_engine is None
+
+
+def test_stt_streaming_toggle_autoswitches_base_model(wizard):
+    """Field report: enabling streaming with model=base made the
+    Transcription test fail at prepare (no base-streaming model exists).
+    The invalid combination must be unrepresentable from the wizard."""
+    state, base = wizard
+    assert state.config.stt.model == "moonshine/base"
+    _post(f"{base}/api/stt/config?token={state.token}", {"streaming": True})
+    assert state.config.stt.model == "moonshine/small"
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["stt.model"] == "moonshine/small"
+    # explicit model choice pends too
+    _post(f"{base}/api/stt/config?token={state.token}",
+          {"model": "moonshine/medium"})
+    assert state.config.stt.model == "moonshine/medium"
+    # switching streaming back off keeps the explicit choice alone
+    _post(f"{base}/api/stt/config?token={state.token}", {"streaming": False})
+    assert state.config.stt.model == "moonshine/medium"
+
+
+def test_page_stt_picker_lists_all_variants(wizard):
+    """Regression: streaming models were hidden until a checkbox was ticked
+    — the picker must present every variant in one list."""
+    state, base = wizard
+    with urllib.request.urlopen(f"{base}/?token={state.token}") as r:
+        html = r.read().decode()
+    assert 'id="sm"' in html
+    assert "models_streaming" in html and "models_batch" in html
+    # grouped presentation: same size can appear in both modes
+    assert "optgroup" in html
+    assert "transcribe while you talk" in html.lower()

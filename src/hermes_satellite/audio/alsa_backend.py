@@ -32,6 +32,13 @@ PRE_ROLL_MS = 300
 # similar clicks read as one "speech" frame to webrtcvad, which used to open
 # recording instantly and burn the whole follow-up window on silence.
 ONSET_FRAMES = 3  # 90 ms
+# Minimum voiced audio for a capture to count as an utterance. If recording
+# ends (trailing silence) having heard less speech than this, the onset was a
+# false trigger (residual chime tail / click that slipped past the debounce)
+# — re-arm and keep waiting instead of returning a click as the utterance.
+# Field symptom without this: at silence_ms 200, capture ended before the
+# user could start talking. Short real words ("no", "stop") run ~250 ms+.
+MIN_SPEECH_MS = 210  # 7 frames
 
 
 class AlsaAudioSource(AudioSource):
@@ -58,7 +65,7 @@ class AlsaAudioSource(AudioSource):
         return self._vad
 
     def capture_utterance(
-        self, is_muted: Callable[[], bool], onset_timeout=None
+        self, is_muted: Callable[[], bool], onset_timeout=None, on_frame=None
     ) -> bytes:
         cfg = self._config
         vad = self._get_vad()
@@ -69,49 +76,77 @@ class AlsaAudioSource(AudioSource):
             else cfg.speech_timeout_seconds
         )
 
-        # Phase 1: wait for speech onset (keeping a pre-roll). Onset means
-        # ONSET_FRAMES consecutive speech frames — the frames leading up to
-        # it stay in the pre-roll, so nothing is clipped.
-        pre_roll: deque = deque(maxlen=max(1, PRE_ROLL_MS // FRAME_MS))
         started = time.monotonic()
         deadline = started + onset
-        frame = b""
-        consecutive = 0
-        while True:
-            if is_muted():
-                return b""
-            if time.monotonic() >= deadline:
-                logger.info("no speech within %.1fs", onset)
-                return b""
-            frame = self._mic.read(samples_per_frame)
-            if vad.is_speech(frame):
-                consecutive += 1
-                if consecutive >= ONSET_FRAMES:
-                    break
-            else:
-                consecutive = 0
-            pre_roll.append(frame)
-        logger.debug(
-            "speech onset after %.2fs", time.monotonic() - started
-        )
 
-        # Phase 2: record until trailing silence or the hard cap.
-        voiced = list(pre_roll)
-        voiced.append(frame)
-        silence_ms = 0
-        start = time.monotonic()
-        while (
-            silence_ms < cfg.silence_ms
-            and time.monotonic() - start < cfg.max_record_seconds
-        ):
-            if is_muted():
-                break
-            frame = self._mic.read(samples_per_frame)
+        while True:  # onset attempts; a false onset re-arms within deadline
+            # Phase 1: wait for speech onset (keeping a pre-roll). Onset
+            # means ONSET_FRAMES consecutive speech frames — the frames
+            # leading up to it stay in the pre-roll, so nothing is clipped.
+            pre_roll: deque = deque(maxlen=max(1, PRE_ROLL_MS // FRAME_MS))
+            frame = b""
+            consecutive = 0
+            while True:
+                if is_muted():
+                    return b""
+                if time.monotonic() >= deadline:
+                    logger.info("no speech within %.1fs", onset)
+                    return b""
+                frame = self._mic.read(samples_per_frame)
+                if vad.is_speech(frame):
+                    consecutive += 1
+                    if consecutive >= ONSET_FRAMES:
+                        break
+                else:
+                    consecutive = 0
+                pre_roll.append(frame)
+            logger.debug(
+                "speech onset after %.2fs", time.monotonic() - started
+            )
+
+            # Phase 2: record until trailing silence or the hard cap.
+            voiced = list(pre_roll)
             voiced.append(frame)
-            silence_ms = 0 if vad.is_speech(frame) else silence_ms + FRAME_MS
-        audio = b"".join(voiced)
-        logger.info("captured %.2fs of audio", len(audio) / 2 / cfg.sample_rate)
-        return audio
+            if on_frame is not None:
+                for buffered in voiced:  # pre-roll + onset, in order
+                    on_frame(buffered)
+            speech_ms = ONSET_FRAMES * FRAME_MS
+            silence_ms = 0
+            muted_out = capped = False
+            start = time.monotonic()
+            while silence_ms < cfg.silence_ms:
+                if time.monotonic() - start >= cfg.max_record_seconds:
+                    capped = True
+                    break
+                if is_muted():
+                    muted_out = True
+                    break
+                frame = self._mic.read(samples_per_frame)
+                voiced.append(frame)
+                if on_frame is not None:
+                    on_frame(frame)
+                if vad.is_speech(frame):
+                    speech_ms += FRAME_MS
+                    silence_ms = 0
+                else:
+                    silence_ms += FRAME_MS
+
+            # Mute and the hard cap end the utterance unconditionally; the
+            # minimum-speech gate only applies to trailing-silence endings.
+            if speech_ms < MIN_SPEECH_MS and not (muted_out or capped):
+                # A click, not an utterance. Re-arm within the original
+                # window so the user still gets their chance to talk. (A
+                # streaming STT session already received these frames —
+                # harmless: a click transcribes to nothing.)
+                logger.debug(
+                    "false onset (%d ms of speech) — re-arming", speech_ms
+                )
+                continue
+            audio = b"".join(voiced)
+            logger.info(
+                "captured %.2fs of audio", len(audio) / 2 / cfg.sample_rate
+            )
+            return audio
 
 
 class AlsaAudioSink(AudioSink):

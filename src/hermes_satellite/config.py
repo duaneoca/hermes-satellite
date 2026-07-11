@@ -116,6 +116,13 @@ class STTConfig:
     backend: str = "moonshine"
     model: str = "moonshine/base"
     language: str = "en"
+    # Streaming transcription: audio is fed to the model WHILE you speak, so
+    # the transcript is ready the moment you stop — removes the ~1s
+    # transcription stall after capture. Requires a streaming model variant:
+    # moonshine/tiny, moonshine/small or moonshine/medium (there is no
+    # base-streaming; small is the closest quality). Separate model weights —
+    # first use downloads them (or run the wizard's Transcription test).
+    streaming: bool = False
 
 
 @dataclass

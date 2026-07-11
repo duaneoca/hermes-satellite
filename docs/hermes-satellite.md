@@ -122,9 +122,17 @@ between pipeline stages would drop the start of speech. The stream delivers
 Capture (`audio/alsa_backend.py`) is VAD-gated by webrtcvad in 30 ms frames:
 wait up to `speech_timeout_seconds` for onset (keeping a 300 ms pre-roll so the
 first syllable isn't clipped), then record until `silence_ms` of trailing
-silence or `max_record_seconds`. Onset requires **90 ms of consecutive speech**
+silence or `max_record_seconds`. With `stt.streaming` on, every captured
+frame is also fed to a Moonshine streaming session as it arrives, so the
+transcript is ready the moment capture ends instead of after a post-capture
+transcription pass. Onset requires **90 ms of consecutive speech**
 — a single loud frame is ignored, so clicks and the WM8960's output-stage pop
-(~15 ms, full scale) can't open recording on their own. While muted, capture
+(~15 ms, full scale) can't open recording on their own. And if recording ends
+by trailing silence having heard less than ~210 ms of voiced audio total, the
+onset is treated as false (a click that beat the debounce) and capture
+**re-arms** within the original window — without this, a tight `silence_ms`
+(e.g. 200) ended capture on the click before the user could start talking.
+Mute and the `max_record_seconds` cap end the utterance unconditionally. While muted, capture
 returns empty and the wake loop drains frames without processing them.
 
 Playback opens the output stream at the TTS engine's native rate
@@ -142,6 +150,12 @@ open for `follow_up_seconds`.
 
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
+
+Every turn ends with one INFO log line for latency work —
+`turn timing: capture 2.4s · stt 1.2s · first-reply 3.1s · first-audio 4.0s
+· total 9.8s` (stage durations for capture/stt; the rest relative to the
+start of recording). It's the feedback loop for tuning `silence_ms` and for
+measuring streaming STT.
 
 ## Earcons, follow-up mode & barge-in
 

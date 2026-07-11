@@ -41,14 +41,20 @@ class FakeSource:
         self._u = list(utterances)
         self.onsets = []
 
-    def capture_utterance(self, is_muted, onset_timeout=None):
+    def capture_utterance(self, is_muted, onset_timeout=None, on_frame=None):
         self.onsets.append(onset_timeout)
-        return self._u.pop(0) if self._u else b""
+        audio = self._u.pop(0) if self._u else b""
+        if on_frame is not None and audio:
+            on_frame(audio)
+        return audio
 
 
 class FakeSTT:
     def __init__(self, texts):
         self._t = list(texts)
+
+    def start_session(self):
+        return None
 
     def transcribe(self, audio):
         return self._t.pop(0) if self._t else ""
@@ -401,4 +407,90 @@ def test_dedicated_stop_model_barge_goes_idle():
     assert len(hermes.calls) == 1
     assert len(source.onsets) == 1           # no post-barge capture
     assert earcons.played == ["wake", "done"]
+    assert sm.state is State.IDLE
+
+
+def test_turn_timing_logged(caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="hermes_satellite.core.pipeline")
+    source = FakeSource([b"audio"])
+    pipe, sm, earcons, sink, hermes = _pipeline([True], source, ["question"])
+    pipe.run_cycle()
+    timing_lines = [r.message for r in caplog.records
+                    if r.message.startswith("turn timing:")]
+    assert len(timing_lines) == 1
+    line = timing_lines[0]
+    for stage in ("capture", "stt", "first-reply", "first-audio", "total"):
+        assert stage in line, line
+
+
+# --- streaming STT sessions -------------------------------------------------
+
+class SessionSTT(FakeSTT):
+    """STT with capture-time sessions; records fed audio and lifecycle."""
+
+    class Session:
+        def __init__(self, outer):
+            self.outer = outer
+            self.fed = []
+            self.finished = False
+            self.aborted = False
+
+        def feed(self, pcm):
+            self.fed.append(pcm)
+
+        def finish(self):
+            self.finished = True
+            return self.outer._t.pop(0) if self.outer._t else ""
+
+        def abort(self):
+            self.aborted = True
+
+    def __init__(self, texts):
+        super().__init__(texts)
+        self.sessions = []
+        self.batch_calls = 0
+
+    def start_session(self):
+        s = self.Session(self)
+        self.sessions.append(s)
+        return s
+
+    def transcribe(self, audio):
+        self.batch_calls += 1
+        return super().transcribe(audio)
+
+
+def test_stt_session_used_for_capture():
+    source = FakeSource([b"spoken-audio"])
+    stt = SessionSTT(["what time is it"])
+    sm = StateMachine(initial=State.IDLE)
+    hermes = FakeHermes()
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True]), audio_source=source,
+        stt=stt, hermes=hermes, tts=FakeTTS(), audio_sink=RecordingSink(),
+        session_key="k", is_muted=lambda: False,
+    )
+    pipe.run_cycle()
+    assert len(stt.sessions) == 1
+    session = stt.sessions[0]
+    assert session.fed == [b"spoken-audio"]   # capture fed the session
+    assert session.finished is True
+    assert stt.batch_calls == 0               # batch path never used
+    assert hermes.calls == [("what time is it", "k")]
+    assert sm.state is State.IDLE
+
+
+def test_stt_session_aborted_when_no_speech():
+    source = FakeSource([b""])
+    stt = SessionSTT([])
+    sm = StateMachine(initial=State.IDLE)
+    pipe = Pipeline(
+        state_machine=sm, wakeword=FakeWake([True]), audio_source=source,
+        stt=stt, hermes=FakeHermes(), tts=FakeTTS(),
+        audio_sink=RecordingSink(), session_key="k", is_muted=lambda: False,
+    )
+    pipe.run_cycle()
+    assert stt.sessions[0].aborted is True
+    assert stt.sessions[0].finished is False
     assert sm.state is State.IDLE

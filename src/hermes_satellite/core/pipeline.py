@@ -91,10 +91,37 @@ class Pipeline:
         # Set while playback is interrupted by a barge-in wake word; consumed
         # by run_cycle to start a fresh turn instead of going idle.
         self._barged = False
+        self._timing: dict = {}
 
     def _chime(self, cue: str) -> None:
         if self.earcons is not None:
             self.earcons.play(cue)
+
+    # -- per-turn timing ----------------------------------------------------
+    # One INFO line per turn so latency work is measured, not guessed:
+    #   turn timing: capture 2.4s · stt 1.2s · first-reply 3.1s ·
+    #                first-audio 4.0s · total 9.8s
+    # capture/stt are stage durations; first-reply/first-audio/total are
+    # relative to the start of recording.
+    def _mark(self, name: str) -> None:
+        self._timing[name] = time.monotonic()
+
+    def _log_timing(self) -> None:
+        t = self._timing
+        start = t.get("start")
+        if start is None:
+            return
+        parts = []
+        if "capture_end" in t:
+            parts.append(f"capture {t['capture_end'] - start:.1f}s")
+        if "stt_end" in t and "capture_end" in t:
+            parts.append(f"stt {t['stt_end'] - t['capture_end']:.1f}s")
+        if "first_reply" in t:
+            parts.append(f"first-reply {t['first_reply'] - start:.1f}s")
+        if "first_audio" in t:
+            parts.append(f"first-audio {t['first_audio'] - start:.1f}s")
+        parts.append(f"total {time.monotonic() - start:.1f}s")
+        logger.info("turn timing: %s", " · ".join(parts))
 
     def _flush_mic(self) -> None:
         """Discard buffered mic audio once the room has gone quiet."""
@@ -145,14 +172,32 @@ class Pipeline:
         in which case the caller resets to idle.
         """
         self.sm.dispatch(Event.RECORDING_STARTED)
+        self._timing = {"start": time.monotonic()}
+        try:
+            return self._run_turn(onset_timeout)
+        finally:
+            self._log_timing()
+
+    def _run_turn(self, onset_timeout: Optional[float]) -> bool:
+        # Streaming STT: transcription runs DURING capture, so the transcript
+        # is ready the moment the user stops talking.
+        session = self.stt.start_session()
         audio = self.audio_source.capture_utterance(
-            self.is_muted, onset_timeout=onset_timeout
+            self.is_muted, onset_timeout=onset_timeout,
+            on_frame=(session.feed if session is not None else None),
         )
+        self._mark("capture_end")
         if not audio:
+            if session is not None:
+                session.abort()
             return False
         self.sm.dispatch(Event.SPEECH_CAPTURED)
 
-        text = self.stt.transcribe(audio)
+        if session is not None:
+            text = session.finish()
+        else:
+            text = self.stt.transcribe(audio)
+        self._mark("stt_end")
         logger.info("transcript: %s", text)
         if not text.strip():
             return False
@@ -179,6 +224,7 @@ class Pipeline:
 
     def _blocking_reply(self, text: str) -> bool:
         reply = self.hermes.send(text, self.session_key)
+        self._mark("first_reply")
         logger.info("hermes reply: %s", reply)
         self.sm.dispatch(Event.RESPONSE_READY)
 
@@ -189,6 +235,7 @@ class Pipeline:
             logger.debug("sanitized reply for speech: %s", speakable)
 
         pcm = self.tts.synthesize(speakable)
+        self._timing.setdefault("first_audio", time.monotonic())
         with self._barge_listener() as interrupt:
             self.audio_sink.play(pcm, self.tts.sample_rate, cancel=interrupt)
         return True
@@ -212,6 +259,7 @@ class Pipeline:
             sentences = iter_sentences(deltas)
             try:
                 first = next(sentences)
+                self._mark("first_reply")
             except StopIteration:
                 logger.info("hermes reply: (empty stream)")
                 return False
@@ -268,6 +316,7 @@ class Pipeline:
                         break
                     if isinstance(item, Exception):
                         raise item
+                    self._timing.setdefault("first_audio", time.monotonic())
                     self.audio_sink.play(
                         item, self.tts.sample_rate, cancel=interrupt
                     )
