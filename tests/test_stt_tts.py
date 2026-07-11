@@ -26,9 +26,10 @@ class FakeStream:
     def add_audio(self, samples, sample_rate=16000):
         self.audio.extend(samples)
 
-    def update_transcription(self):
+    def update_transcription(self, flags=0):
         n = len(self.audio)
-        line = types.SimpleNamespace(text=f"streamed {n} samples")
+        line = types.SimpleNamespace(
+            text=f"streamed {n} samples flags {flags}")
         return types.SimpleNamespace(lines=[line])
 
     def stop(self):
@@ -39,6 +40,8 @@ class FakeStream:
 
 
 class FakeTranscriber:
+    MOONSHINE_FLAG_FORCE_UPDATE = 7
+
     def __init__(self, model_path, model_arch=None):
         self.model_path = model_path
         self.model_arch = model_arch
@@ -282,7 +285,9 @@ def test_moonshine_streaming_session(fake_moonshine):
     session.feed(b"\x00\x40" * 100)
     session.feed(b"\x00\x40" * 60)
     text = session.finish()
-    assert text == "streamed 160 samples"
+    # 160 fed + 300ms of silence padding (4800 @ 16kHz), decoded with the
+    # FORCE_UPDATE flag — both regressions for the dropped-tail field bug
+    assert text == "streamed 4960 samples flags 7"
     stream = stt._transcriber.streams[0]
     assert stream.started and stream.stopped and stream.closed
 
@@ -292,7 +297,7 @@ def test_moonshine_streaming_batch_calls_go_through_session(fake_moonshine):
     wizard's test exercises the same weights the daemon uses."""
     stt = MoonshineSTT(STTConfig(model="moonshine/tiny", streaming=True))
     text = stt.transcribe(b"\x00\x40" * 50)
-    assert text == "streamed 50 samples"
+    assert text == "streamed 4850 samples flags 7"
     assert fake_moonshine.requested[1] == "tiny-streaming-arch"
 
 

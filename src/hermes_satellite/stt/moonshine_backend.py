@@ -105,17 +105,29 @@ def _to_float_samples(audio: bytes):
         return [s / 32768.0 for s in memoryview(audio).cast("h")]
 
 
+# Silence fed before the final decode: with a tight audio.silence_ms the
+# capture ends with very little trailing audio, and the incremental decoder
+# hasn't settled the last words yet. Field symptom: "...like tomorrow?"
+# transcribed as "...going on?" — the tail was dropped or garbled.
+_FINISH_PAD_MS = 300
+
+
 class _MoonshineSession(STTSession):
     """One utterance against a streaming-arch Transcriber.
 
     Verified by loopback (Piper → 30 ms chunks → small-streaming-en):
-    ``add_audio`` keeps up well under real time, and
-    ``update_transcription()`` returns the final Transcript synchronously in
-    ~1 ms — so :meth:`finish` costs nothing after the last frame.
+    ``add_audio`` keeps up well under real time, and the final
+    ``update_transcription`` returns synchronously in ~1 ms — so
+    :meth:`finish` costs effectively nothing after the last frame.
     """
 
     def __init__(self, transcriber, sample_rate: int):
         self._rate = sample_rate
+        # "Decode everything buffered NOW": without this flag the final
+        # transcript can predate the last ~update_interval of audio —
+        # loopback-verified to truncate/garble the end of the utterance.
+        self._force_flag = getattr(
+            transcriber, "MOONSHINE_FLAG_FORCE_UPDATE", 0)
         self._stream = transcriber.create_stream()
         self._stream.start()
 
@@ -127,7 +139,9 @@ class _MoonshineSession(STTSession):
 
     def finish(self) -> str:
         try:
-            transcript = self._stream.update_transcription()
+            pad = [0.0] * (self._rate * _FINISH_PAD_MS // 1000)
+            self._stream.add_audio(pad, sample_rate=self._rate)
+            transcript = self._stream.update_transcription(self._force_flag)
             return " ".join(
                 line.text for line in transcript.lines if line.text
             ).strip()
