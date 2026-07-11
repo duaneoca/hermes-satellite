@@ -306,10 +306,14 @@ ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
   ```bash
   sudo /opt/hermes-satellite/.venv/bin/hermes-satellite doctor --config /etc/hermes-satellite/config.yaml
   ```
-* `~/update-satellite` — pulls the latest revision into `/opt`,
+* `~/update-satellite [branch]` — pulls the latest revision into `/opt`,
   reinstalls into the venv (auto-detects the `[pi4]`/`[pi5]` extra from
   the board, so new dependencies land too), and shows the service status
   after restart. No-op if already at the latest revision.
+  **Canary pattern:** with a branch name it switches the satellite to that
+  branch — put one device on a feature branch (`~/update-satellite latency`)
+  while the rest stay on main; it keeps updating along its branch until you
+  bring it home with `~/update-satellite main`.
 
 ---
 
