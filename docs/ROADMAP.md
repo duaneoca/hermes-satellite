@@ -65,6 +65,8 @@ already shipped; this branch adds:
 - ✅ Per-turn timing instrumentation (`turn timing:` INFO line).
 - ✅ Streaming STT (`stt.streaming` + tiny/small/medium streaming models):
   transcription runs during capture — transcript ready at end of speech.
+  **Hardware caveat (field):** Pi 4 can't sustain small-streaming in real
+  time (dropped words); base batch is the Pi 4 sweet spot. Re-test on Pi 5.
 - ✅ End-of-speech silence knob in the wizard (`audio.silence_ms`).
 - Deferred: local command fast-path (on-device intents skipping Hermes).
 

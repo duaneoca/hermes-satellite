@@ -854,8 +854,19 @@ def _make_handler(state: WizardState):
             started = time.monotonic()
             with _heavy_lock:
                 text = state._stt_engine.transcribe(audio)
+            stt_seconds = round(time.monotonic() - started, 2)
+            note = ""
+            if state.config.stt.streaming and seconds and \
+                    stt_seconds / seconds > 0.7:
+                # Streaming only works if decoding beats real time; a lagging
+                # decoder silently DROPS words (field: head or tail of the
+                # utterance missing on a Pi 4 with small-streaming).
+                note = (f"this CPU decodes at {stt_seconds:.1f}s per "
+                        f"{seconds:.1f}s of speech — too slow to stream "
+                        "reliably; expect dropped words. Pick "
+                        "tiny — streaming, or a batch model.")
             self._json({"transcript": text, "capture_seconds": seconds,
-                        "stt_seconds": round(time.monotonic() - started, 2)})
+                        "stt_seconds": stt_seconds, "note": note})
 
         def _capture_once(self) -> bytes:
             """One VAD-gated utterance, on a mic we open and close ourselves

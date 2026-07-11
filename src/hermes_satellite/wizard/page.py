@@ -391,6 +391,7 @@ function sttTest() {
       text.textContent = r.transcript || "(nothing heard — mic level ok?)";
       document.getElementById("stime").textContent = r.transcript
         ? `(${r.capture_seconds}s of speech, transcribed in ${r.stt_seconds}s)` : "";
+      if (r.note) { stat.textContent = "⚠ " + r.note; }
     });
   });
 }

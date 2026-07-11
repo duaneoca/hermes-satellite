@@ -766,3 +766,29 @@ def test_match_service_ownership(tmp_path, monkeypatch):
     fake.st_uid = fake.st_gid = 0
     _match_service_ownership(cfg)
     assert calls == []
+
+
+def test_stt_test_warns_when_streaming_cannot_keep_up(wizard, monkeypatch):
+    """Field lesson (Pi 4 + small-streaming): a decoder slower than real
+    time silently drops words. The wizard test measures throughput and must
+    say so instead of letting the user debug mystery truncations."""
+    import time as _time
+
+    class SlowEngine:
+        def transcribe(self, audio):
+            _time.sleep(0.85)  # mock capture yields 1.0s of audio
+            return "partial words"
+
+    state, base = wizard
+    state.config.stt.streaming = True
+    state._stt_engine = SlowEngine()
+    _, r = _post(f"{base}/api/stt/test?token={state.token}")
+    assert "too slow to stream" in r["note"]
+
+    class FastEngine:
+        def transcribe(self, audio):
+            return "all the words"
+
+    state._stt_engine = FastEngine()
+    _, r = _post(f"{base}/api/stt/test?token={state.token}")
+    assert r["note"] == ""

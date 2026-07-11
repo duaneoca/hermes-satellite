@@ -45,6 +45,15 @@ the transcript is ready the moment you stop — removing the ~1 s
 transcription stall a Pi 4 pays after capture. Verified by loopback:
 `update_transcription()` finalizes in ~1 ms after the last frame.
 
+**Hardware reality check (field-tested):** streaming only works if the
+model decodes *faster than real time on your CPU*. A lagging decoder doesn't
+just get slow — it silently **drops words** (the head or tail of the
+utterance goes missing). On a **Pi 4**, `small-streaming` does NOT keep up:
+use `moonshine/base` (batch — perfect accuracy, ~1.2 s after capture) or try
+`tiny-streaming`. The wizard's Transcription test measures this and warns
+when the model is over budget (decode time > ~0.7× speech length). Pi 5 is
+untested but its faster cores may handle `small-streaming` — measure there.
+
 Streaming needs a **streaming model variant**, which are separate weights:
 `tiny-streaming-en`, `small-streaming-en`, `medium-streaming-en` — there is
 **no base-streaming**. So with streaming on, set `stt.model` to
