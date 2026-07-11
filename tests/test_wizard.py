@@ -731,3 +731,38 @@ def test_page_stt_picker_lists_all_variants(wizard):
     # grouped presentation: same size can appear in both modes
     assert "optgroup" in html
     assert "transcribe while you talk" in html.lower()
+
+
+def test_match_service_ownership(tmp_path, monkeypatch):
+    """Regression: wizard-as-root downloads (STT models, voices) arrived
+    root-owned in the service's data dir; moonshine's loader FileLocks the
+    model dir even for cached loads, so the hermes-sat daemon failed with
+    PermissionError on every turn."""
+    import os
+    import subprocess
+    import types
+    from hermes_satellite.wizard.server import _match_service_ownership
+
+    cfg = types.SimpleNamespace(data_dir=str(tmp_path))
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        lambda args, **kw: calls.append(args))
+
+    # not root: no-op
+    monkeypatch.setattr(os, "geteuid", lambda: 1000)
+    _match_service_ownership(cfg)
+    assert calls == []
+
+    # root, data dir owned by a service user: chown -R to that owner
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    stat = os.stat(tmp_path)
+    fake = types.SimpleNamespace(st_uid=1234, st_gid=1234)
+    monkeypatch.setattr(type(tmp_path), "stat", lambda self: fake)
+    _match_service_ownership(cfg)
+    assert calls == [["chown", "-R", "1234:1234", str(tmp_path)]]
+
+    # root-owned layout: nothing to match
+    calls.clear()
+    fake.st_uid = fake.st_gid = 0
+    _match_service_ownership(cfg)
+    assert calls == []

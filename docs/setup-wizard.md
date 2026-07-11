@@ -58,7 +58,9 @@ open**.
    STT heard, with capture/transcribe timings. First use downloads the
    Moonshine model **into the service's cache location**
    (`{data_dir}/cache`), so a wizard-first install needs no separate
-   pre-seed step. Also here: the **model picker** —
+   pre-seed step. On a deployed satellite (wizard running as root) the
+   download is automatically re-owned to the service user — moonshine
+   needs write access to its model dir even for cached loads. Also here: the **model picker** —
    one list of all variants, batch (tiny/base: transcribe after you finish)
    and streaming (tiny/small/medium: transcribe while you talk, answer
    starts ~1s sooner; see [moonshine.md](moonshine.md)) — the

@@ -139,6 +139,42 @@ def _ensure_stt_cache(config) -> None:
         logger.info("model cache -> %s (service location)", target)
 
 
+def _match_service_ownership(config) -> None:
+    """Re-own wizard downloads to the service user.
+
+    On a deployed satellite the wizard runs as root, so voices and STT
+    models it downloads into the service's data dir arrive root-owned — and
+    the sandboxed ``hermes-sat`` daemon then can't use them (field incident:
+    moonshine's loader takes a FileLock inside the model directory even when
+    the files already exist, so a root-owned dir breaks the daemon at LOAD
+    time, not just at download time). Everything under ``data_dir`` is
+    chowned to whoever owns ``data_dir`` itself (``hermes-sat`` when
+    deployed; a no-op for interactive root-less runs and root-owned
+    layouts).
+    """
+    import os
+    import subprocess
+
+    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return
+    data_dir = Path(config.data_dir)
+    try:
+        stat = data_dir.stat()
+    except OSError:
+        return
+    if stat.st_uid == 0:
+        return  # root-owned layout: nothing to match
+    try:
+        subprocess.run(
+            ["chown", "-R", f"{stat.st_uid}:{stat.st_gid}", str(data_dir)],
+            capture_output=True, timeout=60,
+        )
+        logger.info("re-owned %s to uid %d (service user)",
+                    data_dir, stat.st_uid)
+    except OSError as exc:
+        logger.warning("could not re-own %s: %s", data_dir, exc)
+
+
 def _preload_heavy_modules() -> None:
     """Import shared C-extension modules once, in the main thread, BEFORE
     the browser can hit us with parallel requests. Field failure without
@@ -739,6 +775,8 @@ def _make_handler(state: WizardState):
                        "within normal parameters."
                 )
             elapsed = round(time.monotonic() - started, 1)
+            if not was_downloaded:
+                _match_service_ownership(state.config)
             _, sink = build_audio(state.config)
             sink.play(pcm, tts.sample_rate)
             # keep the audition as the pending choice
@@ -799,6 +837,7 @@ def _make_handler(state: WizardState):
                     engine.transcribe(b"\x00\x00" * 1600)
                 state._stt_engine = engine
                 downloaded = time.monotonic() - started > 10
+                _match_service_ownership(state.config)
             self._json({"ok": True, "downloaded": downloaded,
                         "elapsed": round(time.monotonic() - started, 1)})
 
