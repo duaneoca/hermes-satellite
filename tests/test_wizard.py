@@ -687,10 +687,13 @@ def test_stt_config_prefill_and_pend(wizard):
     assert body["model"] == "moonshine/base"
     assert "moonshine/small" in body["models_streaming"]
     assert "moonshine/base" in body["models_batch"]
+    assert body["max_record_seconds"] == 10.0
     _post(f"{base}/api/stt/config?token={state.token}",
-          {"streaming": True, "silence_ms": "600"})
+          {"streaming": True, "silence_ms": "600",
+           "max_record_seconds": "25"})
     assert state.config.stt.streaming is True
     assert state.config.audio.silence_ms == 600
+    assert state.config.audio.max_record_seconds == 25.0
     _, pending = _get(f"{base}/api/pending?token={state.token}")
     assert pending["stt.streaming"] is True
     assert pending["audio.silence_ms"] == 600

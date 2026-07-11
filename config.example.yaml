@@ -90,7 +90,8 @@ audio:
   silence_ms: 800
   # Give up if no speech starts within this window after the wake word.
   speech_timeout_seconds: 5.0
-  # Hard cap on a single utterance.
+  # Hard cap on a single utterance — runaway-capture protection (a TV or a
+  # stuck VAD can't pin the mic open). Raise it if long requests get cut off.
   max_record_seconds: 10.0
 
 stt:

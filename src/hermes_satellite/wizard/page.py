@@ -102,8 +102,12 @@ behind your back.</p>
     title="streaming variants transcribe WHILE you talk, so the answer starts ~1s sooner; batch variants transcribe after you finish"></select></label><br>
   <label class="muted">End-of-speech silence
     <input id="sms" type="number" min="200" max="2000" step="50" style="width:5.5rem"
-      title="how long a pause ends your question — every 100ms cut is 100ms off every turn, but too low cuts off slow talkers"
+      title="how long a CONTINUOUS pause ends your question (talking resets it) — every 100ms cut is 100ms off every turn, but too low cuts off slow talkers"
       onchange="sttConfig({silence_ms:this.value})"> ms</label>
+  <label class="muted">Max utterance
+    <input id="smr" type="number" min="5" max="60" step="5" style="width:4.5rem"
+      title="hard cap on one utterance — runaway-capture protection (a TV can't pin the mic open); raise it if it cuts off long requests"
+      onchange="sttConfig({max_record_seconds:this.value})"> s</label>
 </section>
 
 <h2>6 · Voice</h2>
@@ -356,6 +360,7 @@ function sttModel(value) {
 function loadSttConfig() {
   get("/api/stt/config").then(s => {
     document.getElementById("sms").value = s.silence_ms;
+    document.getElementById("smr").value = s.max_record_seconds;
     // tiny appears in BOTH groups on purpose: batch and streaming are
     // different model weights for the same size.
     const batch = s.models_batch.map(m =>

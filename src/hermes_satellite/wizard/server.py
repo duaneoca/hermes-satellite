@@ -21,8 +21,9 @@ Endpoints (all require the one-time token via ``?token=`` or
   POST /api/stt/prepare       load/download the STT model (into the
                               service's cache location)
   POST /api/stt/test          capture one utterance and transcribe it
-  GET  /api/stt/config        {model, streaming, silence_ms, valid models}
-  POST /api/stt/config        any subset of {model, streaming, silence_ms};
+  GET  /api/stt/config        {model, streaming, silence_ms,
+                              max_record_seconds, valid models}
+  POST /api/stt/config        any subset of the same fields;
                               enabling streaming auto-switches an invalid
                               model (base) to moonshine/small
   GET  /api/pending           accumulated changes
@@ -533,6 +534,7 @@ def _make_handler(state: WizardState):
                     "model": state.config.stt.model,
                     "streaming": state.config.stt.streaming,
                     "silence_ms": state.config.audio.silence_ms,
+                    "max_record_seconds": state.config.audio.max_record_seconds,
                     "models_batch": ["moonshine/tiny", "moonshine/base"],
                     "models_streaming": [f"moonshine/{s}"
                                          for s in _STREAMING_SIZES],
@@ -608,6 +610,10 @@ def _make_handler(state: WizardState):
                     if "silence_ms" in body:
                         state.set_pending(
                             "audio", "silence_ms", int(body["silence_ms"]))
+                    if "max_record_seconds" in body:
+                        state.set_pending(
+                            "audio", "max_record_seconds",
+                            float(body["max_record_seconds"]))
                     self._json({"ok": True})
                 elif route == "/api/stt/prepare":
                     self._stt_prepare()
