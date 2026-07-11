@@ -143,6 +143,12 @@ open for `follow_up_seconds`.
 Per-engine details: [wakeword.md](wakeword.md), [moonshine.md](moonshine.md),
 [piper.md](piper.md).
 
+Every turn ends with one INFO log line for latency work —
+`turn timing: capture 2.4s · stt 1.2s · first-reply 3.1s · first-audio 4.0s
+· total 9.8s` (stage durations for capture/stt; the rest relative to the
+start of recording). It's the feedback loop for tuning `silence_ms` and for
+measuring streaming STT.
+
 ## Earcons, follow-up mode & barge-in
 
 Three conversational conveniences layer on the pipeline (`core/pipeline.py`):

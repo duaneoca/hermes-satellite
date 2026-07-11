@@ -402,3 +402,17 @@ def test_dedicated_stop_model_barge_goes_idle():
     assert len(source.onsets) == 1           # no post-barge capture
     assert earcons.played == ["wake", "done"]
     assert sm.state is State.IDLE
+
+
+def test_turn_timing_logged(caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="hermes_satellite.core.pipeline")
+    source = FakeSource([b"audio"])
+    pipe, sm, earcons, sink, hermes = _pipeline([True], source, ["question"])
+    pipe.run_cycle()
+    timing_lines = [r.message for r in caplog.records
+                    if r.message.startswith("turn timing:")]
+    assert len(timing_lines) == 1
+    line = timing_lines[0]
+    for stage in ("capture", "stt", "first-reply", "first-audio", "total"):
+        assert stage in line, line
