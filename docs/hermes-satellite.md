@@ -122,7 +122,10 @@ between pipeline stages would drop the start of speech. The stream delivers
 Capture (`audio/alsa_backend.py`) is VAD-gated by webrtcvad in 30 ms frames:
 wait up to `speech_timeout_seconds` for onset (keeping a 300 ms pre-roll so the
 first syllable isn't clipped), then record until `silence_ms` of trailing
-silence or `max_record_seconds`. Onset requires **90 ms of consecutive speech**
+silence or `max_record_seconds`. With `stt.streaming` on, every captured
+frame is also fed to a Moonshine streaming session as it arrives, so the
+transcript is ready the moment capture ends instead of after a post-capture
+transcription pass. Onset requires **90 ms of consecutive speech**
 — a single loud frame is ignored, so clicks and the WM8960's output-stage pop
 (~15 ms, full scale) can't open recording on their own. While muted, capture
 returns empty and the wake loop drains frames without processing them.

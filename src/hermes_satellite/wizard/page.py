@@ -98,6 +98,14 @@ behind your back.</p>
   <button onclick="sttTest()">Test transcription</button>
   <b id="sstat" class="muted"></b>
   <p>heard: <b id="stext">–</b> <span id="stime" class="muted"></span></p>
+  <label><input id="ss" type="checkbox"
+    onchange="post('/api/stt/config',{streaming:this.checked}).then(loadPending)">
+    Streaming transcription — transcribe while you speak, so the answer
+    starts sooner (uses a different model variant; test it above)</label><br>
+  <label class="muted">End-of-speech silence
+    <input id="sms" type="number" min="200" max="2000" step="50" style="width:5.5rem"
+      title="how long a pause ends your question — every 100ms cut is 100ms off every turn, but too low cuts off slow talkers"
+      onchange="post('/api/stt/config',{silence_ms:this.value}).then(loadPending)"> ms</label>
 </section>
 
 <h2>6 · Voice</h2>
@@ -340,6 +348,12 @@ function wakeStop() {
   clearInterval(wakeTimer);
   document.getElementById("wstat").textContent = "stopped";
 }
+function loadSttConfig() {
+  get("/api/stt/config").then(s => {
+    document.getElementById("ss").checked = s.streaming;
+    document.getElementById("sms").value = s.silence_ms;
+  });
+}
 function sttTest() {
   const stat = document.getElementById("sstat");
   const text = document.getElementById("stext");
@@ -495,7 +509,7 @@ function save() {
         "restart the daemon to apply.";
   });
 }
-loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt(); loadWakeModel();
+loadStatus(); loadAudio(); loadVoices(); loadPending(); loadCards(); loadHermes(); loadBehavior(); loadMqtt(); loadWakeModel(); loadSttConfig();
 </script>
 </body>
 </html>

@@ -175,3 +175,20 @@ def test_sink_play_cancel_aborts_early(monkeypatch):
     sink.play(pcm, 16000, cancel=cancel)
     assert time.monotonic() - started < 0.5
     assert aborted
+
+
+def test_on_frame_receives_preroll_and_speech_in_order():
+    """Streaming STT contract: every frame that lands in the returned audio
+    is also delivered to on_frame, in order — pre-roll included."""
+    src, _ = _source([False, False] + [True] * 5 + [False], silence_ms=90)
+    frames = []
+    audio = src.capture_utterance(lambda: False, on_frame=frames.append)
+    assert b"".join(frames) == audio
+    assert len(frames) == len(audio) // len(FRAME)
+
+
+def test_on_frame_not_called_when_no_speech():
+    src, _ = _source([False], speech_timeout_seconds=0.0)
+    frames = []
+    assert src.capture_utterance(lambda: False, on_frame=frames.append) == b""
+    assert frames == []

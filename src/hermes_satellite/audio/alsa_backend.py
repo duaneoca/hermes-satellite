@@ -58,7 +58,7 @@ class AlsaAudioSource(AudioSource):
         return self._vad
 
     def capture_utterance(
-        self, is_muted: Callable[[], bool], onset_timeout=None
+        self, is_muted: Callable[[], bool], onset_timeout=None, on_frame=None
     ) -> bytes:
         cfg = self._config
         vad = self._get_vad()
@@ -98,6 +98,9 @@ class AlsaAudioSource(AudioSource):
         # Phase 2: record until trailing silence or the hard cap.
         voiced = list(pre_roll)
         voiced.append(frame)
+        if on_frame is not None:
+            for buffered in voiced:  # pre-roll + onset, in order
+                on_frame(buffered)
         silence_ms = 0
         start = time.monotonic()
         while (
@@ -108,6 +111,8 @@ class AlsaAudioSource(AudioSource):
                 break
             frame = self._mic.read(samples_per_frame)
             voiced.append(frame)
+            if on_frame is not None:
+                on_frame(frame)
             silence_ms = 0 if vad.is_speech(frame) else silence_ms + FRAME_MS
         audio = b"".join(voiced)
         logger.info("captured %.2fs of audio", len(audio) / 2 / cfg.sample_rate)

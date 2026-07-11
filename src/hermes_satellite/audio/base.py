@@ -16,7 +16,10 @@ class AudioSource(ABC):
 
     @abstractmethod
     def capture_utterance(
-        self, is_muted: Callable[[], bool], onset_timeout: Optional[float] = None
+        self,
+        is_muted: Callable[[], bool],
+        onset_timeout: Optional[float] = None,
+        on_frame: Optional[Callable[[bytes], None]] = None,
     ) -> bytes:
         """Capture until end-of-speech and return 16-bit PCM.
 
@@ -24,6 +27,11 @@ class AudioSource(ABC):
         before giving up (``None`` = the configured ``speech_timeout_seconds``);
         follow-up mode passes a short window. Returns empty bytes if muted
         throughout or if no speech starts within the window.
+
+        ``on_frame`` (streaming STT): called in order with every frame that
+        becomes part of the utterance — the pre-roll once onset fires, then
+        each subsequent frame — so a transcription session can run while the
+        user is still speaking.
         """
 
 

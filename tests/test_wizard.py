@@ -677,3 +677,19 @@ def test_hermes_prompt_prefill_and_edit(wizard):
     _post(f"{base}/api/hermes/prompt?token={state.token}",
           {"system_prompt": ""})
     assert state.config.hermes.system_prompt == ""
+
+
+def test_stt_config_prefill_and_pend(wizard):
+    state, base = wizard
+    _, body = _get(f"{base}/api/stt/config?token={state.token}")
+    assert body["streaming"] is False
+    assert body["silence_ms"] == 800
+    _post(f"{base}/api/stt/config?token={state.token}",
+          {"streaming": True, "silence_ms": "600"})
+    assert state.config.stt.streaming is True
+    assert state.config.audio.silence_ms == 600
+    _, pending = _get(f"{base}/api/pending?token={state.token}")
+    assert pending["stt.streaming"] is True
+    assert pending["audio.silence_ms"] == 600
+    # engine cache dropped: the next prepare loads the streaming variant
+    assert state._stt_engine is None

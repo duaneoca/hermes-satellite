@@ -13,11 +13,37 @@ from hermes_satellite.tts.piper_backend import PiperTTS
 
 # ---------------------------------------------------------------- moonshine
 
+class FakeStream:
+    def __init__(self):
+        self.audio = []
+        self.started = False
+        self.stopped = False
+        self.closed = False
+
+    def start(self):
+        self.started = True
+
+    def add_audio(self, samples, sample_rate=16000):
+        self.audio.extend(samples)
+
+    def update_transcription(self):
+        n = len(self.audio)
+        line = types.SimpleNamespace(text=f"streamed {n} samples")
+        return types.SimpleNamespace(lines=[line])
+
+    def stop(self):
+        self.stopped = True
+
+    def close(self):
+        self.closed = True
+
+
 class FakeTranscriber:
     def __init__(self, model_path, model_arch=None):
         self.model_path = model_path
         self.model_arch = model_arch
         self.received = None
+        self.streams = []
 
     def transcribe_without_streaming(self, samples, sample_rate=16000):
         self.received = (samples, sample_rate)
@@ -25,11 +51,20 @@ class FakeTranscriber:
         line2 = types.SimpleNamespace(text="world")
         return types.SimpleNamespace(lines=[line1, line2])
 
+    def create_stream(self, **kw):
+        stream = FakeStream()
+        self.streams.append(stream)
+        return stream
+
 
 @pytest.fixture
 def fake_moonshine(monkeypatch, tmp_path):
     module = types.ModuleType("moonshine_voice")
-    module.ModelArch = types.SimpleNamespace(TINY="tiny-arch", BASE="base-arch")
+    module.ModelArch = types.SimpleNamespace(
+        TINY="tiny-arch", BASE="base-arch",
+        TINY_STREAMING="tiny-streaming-arch",
+        SMALL_STREAMING="small-streaming-arch",
+        MEDIUM_STREAMING="medium-streaming-arch")
     model_dir = tmp_path / "base-en"
     model_dir.mkdir()
 
@@ -237,3 +272,45 @@ def test_piper_classic_api_gets_knob_kwargs(monkeypatch):
     cfg = TTSConfig(voice_path="/v.onnx", speaker_id=3, length_scale=0.9)
     PiperTTS(cfg).synthesize("hi")
     assert received == {"speaker_id": 3, "length_scale": 0.9}
+
+
+def test_moonshine_streaming_session(fake_moonshine):
+    stt = MoonshineSTT(STTConfig(model="moonshine/small", streaming=True))
+    session = stt.start_session()
+    assert session is not None
+    assert fake_moonshine.requested[1] == "small-streaming-arch"
+    session.feed(b"\x00\x40" * 100)
+    session.feed(b"\x00\x40" * 60)
+    text = session.finish()
+    assert text == "streamed 160 samples"
+    stream = stt._transcriber.streams[0]
+    assert stream.started and stream.stopped and stream.closed
+
+
+def test_moonshine_streaming_batch_calls_go_through_session(fake_moonshine):
+    """transcribe() in streaming mode uses the streaming model too, so the
+    wizard's test exercises the same weights the daemon uses."""
+    stt = MoonshineSTT(STTConfig(model="moonshine/tiny", streaming=True))
+    text = stt.transcribe(b"\x00\x40" * 50)
+    assert text == "streamed 50 samples"
+    assert fake_moonshine.requested[1] == "tiny-streaming-arch"
+
+
+def test_moonshine_no_session_when_streaming_disabled(fake_moonshine):
+    stt = MoonshineSTT(STTConfig(model="moonshine/base"))
+    assert stt.start_session() is None
+
+
+def test_moonshine_streaming_rejects_base_with_guidance(fake_moonshine):
+    """There is no base-streaming model — the error must say what to use."""
+    stt = MoonshineSTT(STTConfig(model="moonshine/base", streaming=True))
+    with pytest.raises(ValueError, match="moonshine/small"):
+        stt.start_session()
+
+
+def test_moonshine_session_abort_closes_stream(fake_moonshine):
+    stt = MoonshineSTT(STTConfig(model="moonshine/small", streaming=True))
+    session = stt.start_session()
+    session.abort()
+    stream = stt._transcriber.streams[0]
+    assert stream.stopped and stream.closed

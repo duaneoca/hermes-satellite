@@ -179,15 +179,24 @@ class Pipeline:
             self._log_timing()
 
     def _run_turn(self, onset_timeout: Optional[float]) -> bool:
+        # Streaming STT: transcription runs DURING capture, so the transcript
+        # is ready the moment the user stops talking.
+        session = self.stt.start_session()
         audio = self.audio_source.capture_utterance(
-            self.is_muted, onset_timeout=onset_timeout
+            self.is_muted, onset_timeout=onset_timeout,
+            on_frame=(session.feed if session is not None else None),
         )
         self._mark("capture_end")
         if not audio:
+            if session is not None:
+                session.abort()
             return False
         self.sm.dispatch(Event.SPEECH_CAPTURED)
 
-        text = self.stt.transcribe(audio)
+        if session is not None:
+            text = session.finish()
+        else:
+            text = self.stt.transcribe(audio)
         self._mark("stt_end")
         logger.info("transcript: %s", text)
         if not text.strip():
