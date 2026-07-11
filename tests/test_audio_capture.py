@@ -41,11 +41,11 @@ def _source(script, **cfg_kw):
 
 
 def test_capture_onset_speech_then_silence():
-    # 2 silent frames, 5 speech frames, then silence until the 800 ms timeout.
-    src, mic = _source([False, False] + [True] * 5 + [False], silence_ms=90)
+    # 2 silent frames, 10 speech frames, then trailing silence.
+    src, mic = _source([False, False] + [True] * 10 + [False], silence_ms=90)
     audio = src.capture_utterance(lambda: False)
-    # pre-roll (2 silent) + onset + 4 speech + 3 trailing silent (90/30) frames
-    expected_frames = 2 + 5 + 3
+    # pre-roll (2 silent) + 10 speech + 3 trailing silent (90/30) frames
+    expected_frames = 2 + 10 + 3
     assert len(audio) == expected_frames * len(FRAME)
     assert mic.started
 
@@ -180,7 +180,7 @@ def test_sink_play_cancel_aborts_early(monkeypatch):
 def test_on_frame_receives_preroll_and_speech_in_order():
     """Streaming STT contract: every frame that lands in the returned audio
     is also delivered to on_frame, in order — pre-roll included."""
-    src, _ = _source([False, False] + [True] * 5 + [False], silence_ms=90)
+    src, _ = _source([False, False] + [True] * 10 + [False], silence_ms=90)
     frames = []
     audio = src.capture_utterance(lambda: False, on_frame=frames.append)
     assert b"".join(frames) == audio
@@ -192,3 +192,28 @@ def test_on_frame_not_called_when_no_speech():
     frames = []
     assert src.capture_utterance(lambda: False, on_frame=frames.append) == b""
     assert frames == []
+
+
+def test_false_onset_rearms_and_captures_real_speech():
+    """Regression (field, silence_ms=200): a click that slips past the onset
+    debounce used to end capture before the user could start talking. Now a
+    trailing-silence ending with <MIN_SPEECH_MS of voiced audio re-arms
+    within the original onset window."""
+    # click: 3 speech frames, then 3 silent (silence_ms=90 ends attempt 1
+    # with only 90ms of speech) -> re-arm -> real utterance: 10 speech.
+    script = [True, True, True] + [False] * 4 + [True] * 10 + [False]
+    src, _ = _source(script, silence_ms=90)
+    audio = src.capture_utterance(lambda: False)
+    # the returned audio is the SECOND attempt (real speech), not the click:
+    # re-armed pre-roll (silent frames) + 10 speech + 3 trailing
+    assert len(audio) >= 10 * len(FRAME)
+    n_frames = len(audio) // len(FRAME)
+    assert n_frames <= 3 + 10 + 3  # no click content beyond the pre-roll
+
+
+def test_false_onset_only_still_times_out():
+    """A click with no real speech afterwards must still give up at the
+    original onset deadline (no infinite re-arming)."""
+    script = [True, True, True, False]
+    src, _ = _source(script, silence_ms=60, speech_timeout_seconds=0.25)
+    assert src.capture_utterance(lambda: False) == b""
