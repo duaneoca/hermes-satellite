@@ -98,11 +98,8 @@ behind your back.</p>
   <button onclick="sttTest()">Test transcription</button>
   <b id="sstat" class="muted"></b>
   <p>heard: <b id="stext">–</b> <span id="stime" class="muted"></span></p>
-  <label>Model <select id="sm" onchange="sttConfig({model:this.value})"
-    title="tiny/base transcribe after you finish; streaming variants (tiny/small/medium) transcribe while you talk"></select></label>
-  <label><input id="ss" type="checkbox" onchange="sttConfig({streaming:this.checked})">
-    Streaming transcription — transcribe while you speak, so the answer
-    starts sooner (switches to a streaming model variant; test it above)</label><br>
+  <label>Model <select id="sm" onchange="sttModel(this.value)"
+    title="streaming variants transcribe WHILE you talk, so the answer starts ~1s sooner; batch variants transcribe after you finish"></select></label><br>
   <label class="muted">End-of-speech silence
     <input id="sms" type="number" min="200" max="2000" step="50" style="width:5.5rem"
       title="how long a pause ends your question — every 100ms cut is 100ms off every turn, but too low cuts off slow talkers"
@@ -350,17 +347,25 @@ function wakeStop() {
   document.getElementById("wstat").textContent = "stopped";
 }
 function sttConfig(change) {
-  // reload after every change: enabling streaming can auto-switch the model
   post("/api/stt/config", change).then(() => { loadSttConfig(); loadPending(); });
+}
+function sttModel(value) {
+  const sep = value.indexOf(":");
+  sttConfig({model: value.slice(sep + 1), streaming: value.slice(0, sep) === "stream"});
 }
 function loadSttConfig() {
   get("/api/stt/config").then(s => {
-    document.getElementById("ss").checked = s.streaming;
     document.getElementById("sms").value = s.silence_ms;
-    const models = s.streaming ? s.models_streaming : s.models_batch;
-    if (!models.includes(s.model)) models.unshift(s.model);
-    document.getElementById("sm").innerHTML = models.map(m =>
-      `<option ${m===s.model?"selected":""}>${m}</option>`).join("");
+    const opts = [];
+    for (const m of s.models_batch)
+      opts.push({v: "batch:" + m, sel: !s.streaming && m === s.model,
+                 label: m + " — transcribes after you finish speaking"});
+    for (const m of s.models_streaming)
+      opts.push({v: "stream:" + m, sel: s.streaming && m === s.model,
+                 label: m + " — streaming: transcribes while you talk"});
+    if (!opts.some(o => o.sel)) opts[1].sel = true;  // config combo invalid: show default
+    document.getElementById("sm").innerHTML = opts.map(o =>
+      `<option value="${o.v}" ${o.sel?"selected":""}>${o.label}</option>`).join("");
   });
 }
 function sttTest() {

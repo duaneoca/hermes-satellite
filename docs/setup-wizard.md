@@ -58,11 +58,11 @@ open**.
    STT heard, with capture/transcribe timings. First use downloads the
    Moonshine model **into the service's cache location**
    (`{data_dir}/cache`), so a wizard-first install needs no separate
-   pre-seed step. Also here: the **model picker**
-   and **streaming transcription** toggle (transcribe while you speak —
-   needs a tiny/small/medium variant; enabling streaming auto-switches an
-   incompatible model to `moonshine/small`, see [moonshine.md](moonshine.md))
-   and the **end-of-speech silence** window
+   pre-seed step. Also here: the **model picker** —
+   one list of all variants, batch (tiny/base: transcribe after you finish)
+   and streaming (tiny/small/medium: transcribe while you talk, answer
+   starts ~1s sooner; see [moonshine.md](moonshine.md)) — and the
+   **end-of-speech silence** window
    (every 100 ms cut is 100 ms off every turn; too low clips slow talkers).
 6. **Voice** — full catalog + downloaded voices, on-device preview with
    speaker/pace knobs (downloads on demand).

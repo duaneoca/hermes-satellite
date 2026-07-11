@@ -715,3 +715,14 @@ def test_stt_streaming_toggle_autoswitches_base_model(wizard):
     # switching streaming back off keeps the explicit choice alone
     _post(f"{base}/api/stt/config?token={state.token}", {"streaming": False})
     assert state.config.stt.model == "moonshine/medium"
+
+
+def test_page_stt_picker_lists_all_variants(wizard):
+    """Regression: streaming models were hidden until a checkbox was ticked
+    — the picker must present every variant in one list."""
+    state, base = wizard
+    with urllib.request.urlopen(f"{base}/?token={state.token}") as r:
+        html = r.read().decode()
+    assert 'id="sm"' in html
+    assert "models_streaming" in html and "models_batch" in html
+    assert "transcribes while you talk" in html
