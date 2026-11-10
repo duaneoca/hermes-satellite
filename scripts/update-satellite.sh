@@ -4,7 +4,7 @@
 # Handles the full ceremony for a deployed (systemd) satellite:
 #   1. checks whether upstream actually has anything new (no-op exit if not)
 #   2. stops the daemon, pulls, reinstalls into the /opt venv (picks up any
-#      new dependencies; the board's extra — pi4/pi5 — is auto-detected)
+#      new dependencies; the board's extra — pi4/pi5/pizero2 — is auto-detected)
 #   3. restarts the daemon only if it was running before, and shows status
 #
 # Usage:  ./update-satellite.sh [branch]
@@ -65,8 +65,9 @@ sudo git -C "$INSTALL" merge --ff-only --quiet "origin/$BRANCH"
 # Reinstall so new/changed dependencies land; the extra matches the board.
 MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)
 case "$MODEL" in
-    *"Raspberry Pi 5"*) EXTRA="[pi5]" ;;
+    *"Raspberry Pi 5"*) EXTRA="[pi5]" ;;   # either HAT revision
     *"Raspberry Pi 4"*) EXTRA="[pi4]" ;;
+    *"Raspberry Pi Zero 2"*) EXTRA="[pizero2]" ;;
     *)                  EXTRA="" ;;
 esac
 echo "reinstalling into the venv (extras: ${EXTRA:-none})..."

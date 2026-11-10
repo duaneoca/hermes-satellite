@@ -2,6 +2,9 @@
 
 Profile: `hardware_profile: pi5-respeaker-v2`
 
+> Have the **v1** HAT (WM8960) on a Pi 5? Use
+> [pi5-respeaker-v1.md](pi5-respeaker-v1.md) instead.
+
 | Aspect        | Value                                                       |
 | ------------- | ----------------------------------------------------------- |
 | Audio codec   | TLV320AIC3104 (via **device‑tree overlay**, not seeed‑voicecard) |

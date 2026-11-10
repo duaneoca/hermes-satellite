@@ -8,8 +8,12 @@
 # Env vars override any value set in this file.
 
 # Hardware profile selects sane defaults for SPI numbering, GPIO backend and
-# audio devices. Supported: pi4-respeaker-v1 | pi5-respeaker-v2 | mock
+# audio devices. Supported: pi4-respeaker-v1 | pizero2-respeaker-v1 |
+# pi5-respeaker-v1 | pi5-respeaker-v2 | mock
+# (Pi 5 profiles differ by HAT revision: v1 = WM8960, v2 = TLV320AIC3104.)
 # Use "mock" for development on a machine without the HAT (e.g. a laptop).
+# Pi Zero 2 W (512 MB RAM): also set stt.model: moonshine/tiny and a "-low"
+# Piper voice — see docs/hardware/pizero2-respeaker-v1.md.
 hardware_profile: pi5-respeaker-v2
 
 # Daemon log verbosity: DEBUG | INFO | WARNING | ERROR.
@@ -165,6 +169,7 @@ leds:
   # Global brightness 0-31 for the APA102 LEDs.
   brightness: 8
   # SPI bus/device for the on-board APA102 ring. Defaulted from the hardware
-  # profile if omitted (Pi 4: bus 0 dev 1; Pi 5: bus 0 dev 0 => spidev10.0).
+  # profile if omitted (Pi 4 / Zero 2 W: bus 0 dev 1; Pi 5: bus 0 dev 1, or
+  # bus 10 on kernels that enumerate it as spidev10.1).
   spi_bus: null
   spi_device: null
