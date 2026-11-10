@@ -22,7 +22,7 @@ WorkingDirectory=/var/lib/hermes-satellite
 # Re-apply the WM8960 mixer state on every start — defends against stale
 # alsactl snapshots silently disabling the capture path (see the pi4 hardware
 # guide's troubleshooting section). Uncomment on ReSpeaker 2-Mic v1 setups
-# (Pi 4 and Pi Zero 2 W):
+# (Pi 4, Pi Zero 2 W, and Pi 5 with the v1 HAT):
 #ExecStartPre=/opt/hermes-satellite/scripts/wm8960-mixer.sh
 ExecStart=/opt/hermes-satellite/.venv/bin/python -m hermes_satellite \
     --config /etc/hermes-satellite/config.yaml

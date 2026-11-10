@@ -65,7 +65,7 @@ sudo git -C "$INSTALL" merge --ff-only --quiet "origin/$BRANCH"
 # Reinstall so new/changed dependencies land; the extra matches the board.
 MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)
 case "$MODEL" in
-    *"Raspberry Pi 5"*) EXTRA="[pi5]" ;;
+    *"Raspberry Pi 5"*) EXTRA="[pi5]" ;;   # either HAT revision
     *"Raspberry Pi 4"*) EXTRA="[pi4]" ;;
     *"Raspberry Pi Zero 2"*) EXTRA="[pizero2]" ;;
     *)                  EXTRA="" ;;

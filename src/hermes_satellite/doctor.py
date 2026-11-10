@@ -51,7 +51,7 @@ def _import_onnxruntime_quietly():
 
 
 def run_checks(config) -> List[Check]:
-    from .platform import profile_for_board
+    from .platform import profiles_for_board
     from .wizard import mixer
 
     cfg = config
@@ -60,12 +60,13 @@ def run_checks(config) -> List[Check]:
 
     board = _board_model()
     if board:
-        expected = profile_for_board(board)
-        if expected and cfg.hardware_profile != expected:
+        expected = profiles_for_board(board)
+        if expected and cfg.hardware_profile not in expected:
             checks.append(Check(
                 "board", False,
                 f"{board!r} but hardware_profile is "
-                f"{cfg.hardware_profile!r} — set hardware_profile: {expected}",
+                f"{cfg.hardware_profile!r} — set hardware_profile: "
+                + " or ".join(expected),
             ))
         else:
             checks.append(Check("board", True, board))

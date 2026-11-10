@@ -9,7 +9,8 @@
 
 # Hardware profile selects sane defaults for SPI numbering, GPIO backend and
 # audio devices. Supported: pi4-respeaker-v1 | pizero2-respeaker-v1 |
-# pi5-respeaker-v2 | mock
+# pi5-respeaker-v1 | pi5-respeaker-v2 | mock
+# (Pi 5 profiles differ by HAT revision: v1 = WM8960, v2 = TLV320AIC3104.)
 # Use "mock" for development on a machine without the HAT (e.g. a laptop).
 # Pi Zero 2 W (512 MB RAM): also set stt.model: moonshine/tiny and a "-low"
 # Piper voice — see docs/hardware/pizero2-respeaker-v1.md.

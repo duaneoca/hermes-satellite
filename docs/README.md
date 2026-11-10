@@ -13,6 +13,7 @@
 | [piper.md](piper.md) | On-device TTS: install, voices, playback |
 | [hardware/pi4-respeaker-v1.md](hardware/pi4-respeaker-v1.md) | Pi 4 + ReSpeaker 2-Mic HAT v1 (WM8960) setup |
 | [hardware/pizero2-respeaker-v1.md](hardware/pizero2-respeaker-v1.md) | Pi Zero 2 W + ReSpeaker 2-Mic HAT v1 (WM8960) setup — low-RAM config |
+| [hardware/pi5-respeaker-v1.md](hardware/pi5-respeaker-v1.md) | Pi 5 + ReSpeaker 2-Mic HAT v1 (WM8960) setup — incl. co-located with Hermes |
 | [hardware/pi5-respeaker-v2.md](hardware/pi5-respeaker-v2.md) | Pi 5 + ReSpeaker 2-Mic HAT v2 (TLV320AIC3104) setup |
 | [hardware/seeed-software.md](hardware/seeed-software.md) | Which Seeed drivers/overlays/forks are used, and why, per kernel |
 

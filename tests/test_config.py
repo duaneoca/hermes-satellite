@@ -231,3 +231,13 @@ def test_pizero2_profile_defaults(tmp_path):
     """))
     assert cfg.hardware_profile == "pizero2-respeaker-v1"
     assert (cfg.leds.spi_bus, cfg.leds.spi_device) == (0, 1)
+
+
+def test_pi5_v1_profile_defaults(tmp_path):
+    cfg = load_config(_write(tmp_path, """
+        hardware_profile: pi5-respeaker-v1
+        wakeword:
+          model_path: /x.ppn
+    """))
+    assert cfg.hardware_profile == "pi5-respeaker-v1"
+    assert (cfg.leds.spi_bus, cfg.leds.spi_device) == (0, 1)

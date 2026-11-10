@@ -107,12 +107,28 @@ def test_wake_models_matches_versioned_filenames(tmp_path, monkeypatch):
     assert check.ok is True, check.detail
 
 
-def test_profile_for_board():
-    from hermes_satellite.platform import profile_for_board
-    assert profile_for_board("Raspberry Pi Zero 2 W Rev 1.0") == "pizero2-respeaker-v1"
-    assert profile_for_board("Raspberry Pi 4 Model B Rev 1.5") == "pi4-respeaker-v1"
-    assert profile_for_board("Raspberry Pi 5 Model B Rev 1.0") == "pi5-respeaker-v2"
-    assert profile_for_board("Raspberry Pi 3 Model B") is None
+def test_profiles_for_board():
+    from hermes_satellite.platform import profiles_for_board
+    assert profiles_for_board("Raspberry Pi Zero 2 W Rev 1.0") == ("pizero2-respeaker-v1",)
+    assert profiles_for_board("Raspberry Pi 4 Model B Rev 1.5") == ("pi4-respeaker-v1",)
+    assert set(profiles_for_board("Raspberry Pi 5 Model B Rev 1.0")) == {
+        "pi5-respeaker-v1", "pi5-respeaker-v2"}
+    assert profiles_for_board("Raspberry Pi 3 Model B") == ()
+
+
+def test_board_check_pi5_accepts_both_hats(tmp_path, monkeypatch):
+    from hermes_satellite.wizard import mixer as mixer_mod
+    monkeypatch.setattr(mixer_mod, "list_cards", lambda *a, **k: [])
+    monkeypatch.setattr(doctor_mod, "_board_model",
+                        lambda path="/x": "Raspberry Pi 5 Model B Rev 1.0")
+    config = _config(tmp_path)
+    for profile in ("pi5-respeaker-v1", "pi5-respeaker-v2"):
+        config.hardware_profile = profile
+        assert {c.name: c for c in run_checks(config)}["board"].ok is True
+    config.hardware_profile = "pi4-respeaker-v1"
+    board = {c.name: c for c in run_checks(config)}["board"]
+    assert board.ok is False
+    assert "pi5-respeaker-v1" in board.detail and "pi5-respeaker-v2" in board.detail
 
 
 def test_board_check_zero2(tmp_path, monkeypatch):

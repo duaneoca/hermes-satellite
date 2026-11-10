@@ -38,7 +38,8 @@ pi4 = [
     "sounddevice>=0.4",
     "webrtcvad-wheels>=2.0.14",
 ]
-# Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 (TLV320AIC3104). RP1 => lgpio for the button.
+# Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 (TLV320AIC3104) or v1 (WM8960) —
+# the codec is an OS overlay, so both HATs share one package set. RP1 => lgpio.
 pi5 = [
     "spidev>=3.5",
     "lgpio>=0.2",
