@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--hardware-profile",
         default=None,
-        help="override config hardware_profile (pi4-respeaker-v1 | pi5-respeaker-v2 | mock)",
+        help="override config hardware_profile (pi4-respeaker-v1 | pizero2-respeaker-v1 | pi5-respeaker-v2 | mock)",
     )
     parser.add_argument(
         "--demo", action="store_true",

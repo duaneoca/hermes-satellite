@@ -21,6 +21,7 @@ button toggles microphone mute.
 2. **Follow your board's guide, top to bottom** — it covers the audio codec,
    SPI, groups, and install order:
    - **[Raspberry Pi 4 + ReSpeaker 2-Mic HAT v1 →](docs/hardware/pi4-respeaker-v1.md)**
+   - **[Raspberry Pi Zero 2 W + ReSpeaker 2-Mic HAT v1 →](docs/hardware/pizero2-respeaker-v1.md)**
    - **[Raspberry Pi 5 + ReSpeaker 2-Mic HAT v2 →](docs/hardware/pi5-respeaker-v2.md)**
 3. **Run the setup wizard** for everything audio — mic calibration with a
    live meter, wake-word tuning, voice audition, Hermes connection test:
@@ -74,9 +75,11 @@ the state machine through a full cycle. Press Enter to toggle mute.
 
 ## Hardware
 
-Two hardware profiles are supported (set `hardware_profile` in config):
+Three hardware profiles are supported (set `hardware_profile` in config):
 
 - `pi4-respeaker-v1` — Raspberry Pi 4 + ReSpeaker 2‑Mic HAT v1 (WM8960)
+- `pizero2-respeaker-v1` — Raspberry Pi Zero 2 W + ReSpeaker 2‑Mic HAT v1 (WM8960;
+  512 MB RAM — needs swap and the small models)
 - `pi5-respeaker-v2` — Raspberry Pi 5 + ReSpeaker 2‑Mic HAT v2 (TLV320AIC3104)
 
 See the per‑board setup guides under [`docs/hardware/`](docs/hardware/).
@@ -93,6 +96,7 @@ See the per‑board setup guides under [`docs/hardware/`](docs/hardware/).
 - [Moonshine (STT)](docs/moonshine.md)
 - [Piper (TTS)](docs/piper.md)
 - Hardware: [Pi 4 + HAT v1](docs/hardware/pi4-respeaker-v1.md) ·
+  [Pi Zero 2 W + HAT v1](docs/hardware/pizero2-respeaker-v1.md) ·
   [Pi 5 + HAT v2](docs/hardware/pi5-respeaker-v2.md) ·
   [Seeed software notes](docs/hardware/seeed-software.md)
 

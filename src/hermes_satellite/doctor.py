@@ -51,6 +51,7 @@ def _import_onnxruntime_quietly():
 
 
 def run_checks(config) -> List[Check]:
+    from .platform import profile_for_board
     from .wizard import mixer
 
     cfg = config
@@ -59,12 +60,8 @@ def run_checks(config) -> List[Check]:
 
     board = _board_model()
     if board:
-        expected = None
-        if "Raspberry Pi 4" in board:
-            expected = "pi4-respeaker-v1"
-        elif "Raspberry Pi 5" in board:
-            expected = "pi5-respeaker-v2"
-        if expected and not cfg.hardware_profile.startswith(expected[:3]):
+        expected = profile_for_board(board)
+        if expected and cfg.hardware_profile != expected:
             checks.append(Check(
                 "board", False,
                 f"{board!r} but hardware_profile is "
@@ -104,6 +101,7 @@ def run_checks(config) -> List[Check]:
     else:
         checks.append(Check("alsa_cards", True, ", ".join(cards)))
 
+    checks.append(_check_memory(cfg))
     checks.append(_check_wake_models(cfg))
     checks.append(_check_stt_cache(cfg))
 
@@ -139,6 +137,49 @@ def run_checks(config) -> List[Check]:
             f"({type(exc).__name__})",
         ))
     return checks
+
+
+# Below this much RAM (Pi Zero 2 W: 512 MB) the default models don't fit
+# without swap: openWakeWord + Moonshine + Piper peak well past 400 MB.
+LOW_RAM_MB = 1024
+MIN_SWAP_MB = 1000
+
+
+def _meminfo_mb(path: str = "/proc/meminfo") -> dict:
+    out = {}
+    try:
+        for line in Path(path).read_text().splitlines():
+            key, _, rest = line.partition(":")
+            fields = rest.split()
+            if fields and fields[0].isdigit():
+                out[key] = int(fields[0]) // 1024  # kB -> MB
+    except OSError:
+        pass
+    return out
+
+
+def _check_memory(cfg, path: str = "/proc/meminfo") -> Check:
+    """Low-RAM boards need swap and the small models."""
+    info = _meminfo_mb(path)
+    ram, swap = info.get("MemTotal"), info.get("SwapTotal", 0)
+    if not ram:
+        return Check("memory", None, "unknown (no /proc/meminfo)")
+    detail = f"{ram} MB RAM, {swap} MB swap"
+    if ram >= LOW_RAM_MB:
+        return Check("memory", None, detail)
+    hints = []
+    if swap < MIN_SWAP_MB:
+        hints.append(f"add >= {MIN_SWAP_MB} MB swap")
+    if cfg.stt.backend.lower() == "moonshine" and \
+            not cfg.stt.model.endswith("tiny"):
+        hints.append("use stt.model: moonshine/tiny")
+    if hints:
+        return Check(
+            "memory", swap >= MIN_SWAP_MB,
+            f"{detail} — low-RAM board: " + "; ".join(hints)
+            + " (docs/hardware/pizero2-respeaker-v1.md)",
+        )
+    return Check("memory", True, detail)
 
 
 def _check_wake_models(cfg) -> Check:

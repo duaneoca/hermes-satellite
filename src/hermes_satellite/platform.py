@@ -1,7 +1,7 @@
 """Hardware profiles and GPIO backend selection.
 
-This is the single place the Raspberry Pi 4 (ReSpeaker 2-Mic HAT v1) and
-Raspberry Pi 5 (ReSpeaker 2-Mic HAT v2) differences live. Everything the rest
+This is the single place the Raspberry Pi 4 / Zero 2 W (ReSpeaker 2-Mic HAT
+v1) and Raspberry Pi 5 (ReSpeaker 2-Mic HAT v2) differences live. Everything the rest
 of the codebase needs to differ by hardware — SPI numbering for the APA102
 LEDs, which GPIO library drives the HAT button, the number of on-board LEDs —
 is resolved from a named :class:`HardwareProfile`.
@@ -55,6 +55,18 @@ PROFILES: dict[str, HardwareProfile] = {
         button_gpio=RESPEAKER_BUTTON_GPIO,
         audio_hint="WM8960 via wm8960-soundcard overlay (ALSA card 'seeed2micvoicec')",
     ),
+    # Pi Zero 2 W: same BCM GPIO/SPI numbering and the same WM8960 overlay as
+    # the Pi 4 — only RAM (512 MB) and CPU speed differ, which is a model-size
+    # concern handled in config (docs/hardware/pizero2-respeaker-v1.md).
+    "pizero2-respeaker-v1": HardwareProfile(
+        name="pizero2-respeaker-v1",
+        led_count=RESPEAKER_LED_COUNT,
+        spi_bus=0,
+        spi_device=1,
+        gpio_backend=GPIO_LGPIO,
+        button_gpio=RESPEAKER_BUTTON_GPIO,
+        audio_hint="WM8960 via wm8960-soundcard overlay (ALSA card 'seeed2micvoicec')",
+    ),
     "pi5-respeaker-v2": HardwareProfile(
         name="pi5-respeaker-v2",
         led_count=RESPEAKER_LED_COUNT,
@@ -79,6 +91,21 @@ PROFILES: dict[str, HardwareProfile] = {
 }
 
 DEFAULT_PROFILE = "pi5-respeaker-v2"
+
+# /proc/device-tree/model substring -> the profile for that board.
+BOARD_PROFILES: tuple[tuple[str, str], ...] = (
+    ("Raspberry Pi Zero 2", "pizero2-respeaker-v1"),
+    ("Raspberry Pi 4", "pi4-respeaker-v1"),
+    ("Raspberry Pi 5", "pi5-respeaker-v2"),
+)
+
+
+def profile_for_board(model: str) -> str | None:
+    """The supported profile for a board model string, or None if unknown."""
+    for needle, profile in BOARD_PROFILES:
+        if needle in model:
+            return profile
+    return None
 
 
 def get_profile(name: str) -> HardwareProfile:

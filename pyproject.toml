@@ -54,6 +54,9 @@ pi5 = [
     "sounddevice>=0.4",
     "webrtcvad-wheels>=2.0.14",
 ]
+# Raspberry Pi Zero 2 W + ReSpeaker 2-Mic HAT v1 (WM8960): same stack as the
+# Pi 4. Needs a 64-bit (aarch64) OS — onnxruntime/moonshine have no armv7 wheels.
+pizero2 = ["hermes-satellite[pi4]"]
 dev = [
     "pytest>=7.0",
     "responses>=0.23",

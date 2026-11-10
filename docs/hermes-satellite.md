@@ -251,7 +251,7 @@ stays your user's and is unrelated to the deployed copy.
    sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" python install 3.11
    sudo UV_PYTHON_INSTALL_DIR=/opt/hermes-satellite/python "$HOME/.local/bin/uv" venv --seed --python 3.11 /opt/hermes-satellite/.venv
    sudo /opt/hermes-satellite/.venv/bin/pip install --upgrade pip setuptools wheel
-   sudo /opt/hermes-satellite/.venv/bin/pip install -e "/opt/hermes-satellite[pi4]"  # or [pi5]
+   sudo /opt/hermes-satellite/.venv/bin/pip install -e "/opt/hermes-satellite[pi4]"  # or [pi5] / [pizero2]
    # Pre-seed the openWakeWord model files INTO THIS venv — the wizard only
    # downloaded them into your interactive clone's venv, and the sandboxed
    # service cannot write to /opt to fetch them itself:
@@ -286,6 +286,7 @@ stays your user's and is unrelated to the deployed copy.
    ```bash
    sudo mkdir -p /var/lib/hermes-satellite/cache
    sudo XDG_CACHE_HOME=/var/lib/hermes-satellite/cache /opt/hermes-satellite/.venv/bin/python -c "import moonshine_voice as mv; mv.get_model_for_language('en', mv.ModelArch.BASE)"
+   # (Pi Zero 2 W with stt.model: moonshine/tiny -> mv.ModelArch.TINY)
    # (or, if ~/.cache/moonshine_voice exists from interactive runs:
    #  sudo cp -r ~/.cache/moonshine_voice /var/lib/hermes-satellite/cache/ )
    sudo chown -R hermes-sat:hermes-sat /var/lib/hermes-satellite
@@ -321,7 +322,7 @@ ln -s /opt/hermes-satellite/scripts/update-satellite.sh ~/update-satellite
   sudo /opt/hermes-satellite/.venv/bin/hermes-satellite doctor --config /etc/hermes-satellite/config.yaml
   ```
 * `~/update-satellite [branch]` — pulls the latest revision into `/opt`,
-  reinstalls into the venv (auto-detects the `[pi4]`/`[pi5]` extra from
+  reinstalls into the venv (auto-detects the `[pi4]`/`[pi5]`/`[pizero2]` extra from
   the board, so new dependencies land too), and shows the service status
   after restart. No-op if already at the latest revision.
   **Canary pattern:** with a branch name it switches the satellite to that
